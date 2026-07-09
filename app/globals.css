@@ -206,7 +206,7 @@ button {
 .eyebrow {
   margin: 0;
   color: var(--coral);
-  font-size: 0.86rem;
+  font-size: 1rem;
   font-weight: 800;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -350,10 +350,19 @@ button {
 .toolbar h2,
 .column-heading h2,
 .auth-dialog h2 {
-  margin: 6px 0 0;
-  font-size: 2rem;
+  margin: 8px 0 0;
+  font-size: 2.35rem;
   line-height: 1.15;
   letter-spacing: 0;
+}
+
+.column-heading .eyebrow {
+  font-size: clamp(1.2rem, 1.35vw, 1.45rem);
+}
+
+.column-heading h2 {
+  font-size: clamp(3rem, 3.5vw, 4rem);
+  line-height: 1.05;
 }
 
 .filters {
@@ -401,10 +410,10 @@ button {
 }
 
 .match-filter-panel {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
+  display: flex;
   gap: 18px;
   align-items: end;
+  flex-wrap: nowrap;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.72);
@@ -412,16 +421,26 @@ button {
 }
 
 .match-filter-panel .city-field {
+  flex: 1 1 auto;
+  min-width: 0;
   margin-top: 0;
 }
 
 .match-city-toggle {
-  grid-template-columns: repeat(6, minmax(78px, 1fr));
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
   overflow-x: auto;
   padding-bottom: 2px;
 }
 
+.match-city-toggle .filter-chip {
+  flex: 1 0 88px;
+  min-width: 88px;
+}
+
 .match-district-field {
+  flex: 0 0 220px;
   width: 220px;
   min-width: 0;
   max-width: 220px;
@@ -442,7 +461,7 @@ button {
 }
 
 .column-heading {
-  min-height: 68px;
+  min-height: 88px;
 }
 
 .match-list {
@@ -731,12 +750,30 @@ textarea:disabled {
   }
 
   .match-filter-panel {
-    grid-template-columns: minmax(0, 1fr) 220px;
     overflow-x: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .match-filter-panel {
+    align-items: stretch;
+    flex-direction: column;
+    overflow-x: visible;
   }
 
   .match-city-toggle {
-    grid-template-columns: repeat(6, minmax(78px, 1fr));
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: visible;
+  }
+
+  .match-city-toggle .filter-chip {
+    min-width: 0;
+  }
+
+  .match-district-field {
+    width: 100%;
+    max-width: none;
   }
 }
 
@@ -782,7 +819,7 @@ textarea:disabled {
   }
 
   .match-city-toggle {
-    grid-template-columns: repeat(6, minmax(78px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .user-pill {
