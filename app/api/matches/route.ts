@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceRoleKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 type CreateMatchBody = {
     userId?: string;
@@ -21,14 +22,16 @@ function isValidUuid(value: string) {
 
 export async function POST(request: NextRequest) {
     try {
-        if (!supabaseUrl || !supabaseServiceRoleKey) {
+        const supabaseKey = supabaseServiceRoleKey ?? supabasePublishableKey;
+
+        if (!supabaseUrl || !supabaseKey) {
             return NextResponse.json(
                 { message: "Supabase environment variables are missing." },
                 { status: 500 }
             );
         }
 
-        const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+        const supabase = createClient(supabaseUrl, supabaseKey);
 
         const body = (await request.json()) as CreateMatchBody;
 
@@ -100,7 +103,7 @@ export async function POST(request: NextRequest) {
                 court_id: courtId,
                 play_time: parsedMatchTime.toISOString(),
                 required_players: maxPlayers,
-                joined_players: 0,
+                joined_players: 1,
                 estimated_fee_per_person: normalizedFee,
                 note: notes ?? null,
                 status: "徵求中",
