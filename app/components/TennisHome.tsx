@@ -51,6 +51,29 @@ type MatchResponse = {
   error?: string;
 };
 
+type MatchSummary = {
+  id: string;
+  playTime: string;
+  feePerPerson: number;
+  status: string;
+  court: {
+    id: string;
+    name: string;
+    city: string;
+    district: string | null;
+  } | null;
+  host: {
+    id: string;
+    nickname: string;
+  };
+};
+
+type MatchesResponse = {
+  matches?: MatchSummary[];
+  message?: string;
+  error?: string;
+};
+
 const STORAGE_KEY = "tennis-taiwan-user";
 
 const municipalities = [
@@ -244,33 +267,6 @@ const municipalities = [
   },
 ] as const;
 
-const sampleMatches = [
-  {
-    court: "台北青年公園網球場",
-    time: "今天 19:30",
-    level: "NTRP 3.0-4.0",
-    players: "2/4",
-    fee: "NT$180",
-    host: "Ming",
-  },
-  {
-    court: "台中惠文網球場",
-    time: "明天 08:00",
-    level: "NTRP 2.5+",
-    players: "1/2",
-    fee: "AA",
-    host: "Ariel",
-  },
-  {
-    court: "高雄陽明網球中心",
-    time: "週六 16:00",
-    level: "NTRP 4.0",
-    players: "3/4",
-    fee: "NT$220",
-    host: "Ken",
-  },
-];
-
 function parseStoredUser(snapshot: string): StoredUser | null {
   try {
     return snapshot ? (JSON.parse(snapshot) as StoredUser) : null;
@@ -324,6 +320,11 @@ export default function TennisHome() {
   const [notes, setNotes] = useState("");
   const [createStatus, setCreateStatus] = useState("");
   const [isCreatingMatch, setIsCreatingMatch] = useState(false);
+  const [openMatches, setOpenMatches] = useState<MatchSummary[]>([]);
+  const [matchesStatus, setMatchesStatus] = useState("正在載入球局...");
+  const [selectedMatchCity, setSelectedMatchCity] = useState("");
+  const [selectedMatchDistrict, setSelectedMatchDistrict] = useState("");
+  const [matchesRefreshKey, setMatchesRefreshKey] = useState(0);
   const authSnapshot = useSyncExternalStore(
     subscribeToAuthStore,
     getAuthSnapshot,
@@ -351,6 +352,16 @@ export default function TennisHome() {
         ?.districts ?? []
     );
   }, [selectedCity]);
+
+  const matchDistrictOptions = useMemo(() => {
+    if (!selectedMatchCity) return [];
+
+    return (
+      municipalities.find(
+        (municipality) => municipality.city === selectedMatchCity
+      )?.districts ?? []
+    );
+  }, [selectedMatchCity]);
 
   const selectedCourt = useMemo(
     () => courts.find((court) => court.id === selectedCourtId),
@@ -405,6 +416,51 @@ export default function TennisHome() {
       controller.abort();
     };
   }, [selectedCity, selectedDistrict]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const params = new URLSearchParams();
+
+    if (selectedMatchCity) {
+      params.set("city", selectedMatchCity);
+    }
+
+    if (selectedMatchDistrict) {
+      params.set("district", selectedMatchDistrict);
+    }
+
+    async function loadMatches() {
+      try {
+        const queryString = params.toString();
+        const response = await fetch(
+          queryString ? `/api/matches?${queryString}` : "/api/matches",
+          { signal: controller.signal }
+        );
+        const data = (await response.json()) as MatchesResponse;
+
+        if (!response.ok) {
+          setMatchesStatus(data.message ?? data.error ?? "讀取球局資料失敗。");
+          return;
+        }
+
+        const nextMatches = data.matches ?? [];
+        setOpenMatches(nextMatches);
+        setMatchesStatus(nextMatches.length > 0 ? "" : "目前沒有符合條件的球局。");
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+
+        setMatchesStatus("無法讀取球局資料，請稍後再試。");
+      }
+    }
+
+    loadMatches();
+
+    return () => {
+      controller.abort();
+    };
+  }, [selectedMatchCity, selectedMatchDistrict, matchesRefreshKey]);
 
   function resetForm(nextMode: AuthMode) {
     setAuthMode(nextMode);
@@ -509,6 +565,35 @@ export default function TennisHome() {
     setCreateStatus("");
   }
 
+  function handleMatchCitySelect(city: string) {
+    const nextCity = selectedMatchCity === city ? "" : city;
+
+    setSelectedMatchCity(nextCity);
+    setSelectedMatchDistrict("");
+    setOpenMatches([]);
+    setMatchesStatus("正在載入球局...");
+  }
+
+  function handleMatchDistrictSelect(district: string) {
+    setSelectedMatchDistrict(district);
+    setOpenMatches([]);
+    setMatchesStatus("正在載入球局...");
+  }
+
+  function formatMatchTime(value: string) {
+    return new Intl.DateTimeFormat("zh-Hant-TW", {
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date(value));
+  }
+
+  function formatFee(value: number) {
+    return value > 0 ? `NT$${Math.round(value)}` : "免費";
+  }
+
   async function handleCreateMatch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setCreateStatus("");
@@ -553,6 +638,7 @@ export default function TennisHome() {
       setMatchTime("");
       setFee("0");
       setNotes("");
+      setMatchesRefreshKey((current) => current + 1);
     } catch {
       setCreateStatus("網路連線異常，請稍後再試。");
     } finally {
@@ -642,55 +728,105 @@ export default function TennisHome() {
       </section>
 
       <section className="workspace" aria-label="約球工作區">
-        <div className="toolbar">
-          <div>
-            <p className="eyebrow">Open matches</p>
-            <h2>近期球局</h2>
-          </div>
-        </div>
-
         <div className="content-grid">
-          <div className="match-list">
-            {sampleMatches.map((match) => (
-              <article className="match-card" key={`${match.court}-${match.time}`}>
-                <div>
-                  <p className="match-time">{match.time}</p>
-                  <h3>{match.court}</h3>
-                  <p>{match.level}</p>
-                </div>
-                <div className="match-meta">
-                  <span>{match.players}</span>
-                  <span>{match.fee}</span>
-                  <span>Host {match.host}</span>
-                </div>
-                <button className="join-button" type="button">
-                  加入
-                </button>
-              </article>
-            ))}
-          </div>
-
-          <aside className="create-panel" aria-label="建立球局">
-            <p className="eyebrow">Create</p>
-            <h2>發起新球局</h2>
-            <div className="city-field">
-              <span className="field-caption">選擇城市</span>
-              <div className="city-toggle" aria-label="選擇城市">
-                {municipalities.map(({ city }) => (
-                  <button
-                    className={`filter-chip ${
-                      selectedCity === city ? "active" : ""
-                    }`}
-                    key={city}
-                    onClick={() => handleCitySelect(city)}
-                    type="button"
-                  >
-                    {city}
-                  </button>
-                ))}
-              </div>
+          <section className="match-column" aria-labelledby="matches-title">
+            <div className="column-heading">
+              <p className="eyebrow">Open matches</p>
+              <h2 id="matches-title">近期球局</h2>
             </div>
-            <form className="compact-form" onSubmit={handleCreateMatch}>
+
+            <div className="match-list">
+              <div className="match-filter-panel" aria-label="篩選近期球局">
+                <div className="city-field">
+                  <div
+                    className="city-toggle match-city-toggle"
+                    aria-label="選擇球局城市"
+                  >
+                    {municipalities.map(({ city }) => (
+                      <button
+                        aria-pressed={selectedMatchCity === city}
+                        className={`filter-chip ${
+                          selectedMatchCity === city ? "active" : ""
+                        }`}
+                        key={city}
+                        onClick={() => handleMatchCitySelect(city)}
+                        type="button"
+                      >
+                        {city}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <label className="match-district-field">
+                  行政區
+                  <select
+                    disabled={!selectedMatchCity}
+                    onChange={(event) =>
+                      handleMatchDistrictSelect(event.target.value)
+                    }
+                    value={selectedMatchDistrict}
+                  >
+                    <option value="">不限行政區</option>
+                    {matchDistrictOptions.map((district) => (
+                      <option key={district} value={district}>
+                        {district}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              {matchesStatus ? (
+                <div className="empty-state" role="status">
+                  {matchesStatus}
+                </div>
+              ) : null}
+
+              {openMatches.map((match) => (
+                <article className="match-card" key={match.id}>
+                  <div>
+                    <p className="match-time">
+                      {formatMatchTime(match.playTime)}
+                    </p>
+                    <h3>{match.court?.name ?? "未知球場"}</h3>
+                    <p>創建者：{match.host.nickname}</p>
+                  </div>
+                  <div className="match-meta">
+                    <span>{formatFee(match.feePerPerson)} / 人</span>
+                  </div>
+                  <button className="join-button" type="button">
+                    加入
+                  </button>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <aside className="create-column" aria-labelledby="create-title">
+            <div className="column-heading">
+              <p className="eyebrow">Create</p>
+              <h2 id="create-title">發起新球局</h2>
+            </div>
+            <div className="create-panel">
+              <div className="city-field">
+                <span className="field-caption">選擇城市</span>
+                <div className="city-toggle" aria-label="選擇城市">
+                  {municipalities.map(({ city }) => (
+                    <button
+                      className={`filter-chip ${
+                        selectedCity === city ? "active" : ""
+                      }`}
+                      key={city}
+                      onClick={() => handleCitySelect(city)}
+                      type="button"
+                    >
+                      {city}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <form className="compact-form" onSubmit={handleCreateMatch}>
               <label>
                 行政區
                 <select
@@ -804,7 +940,8 @@ export default function TennisHome() {
                     ? "建立球局"
                     : "登入後建立"}
               </button>
-            </form>
+              </form>
+            </div>
           </aside>
         </div>
       </section>

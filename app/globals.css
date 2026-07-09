@@ -206,7 +206,7 @@ button {
 .eyebrow {
   margin: 0;
   color: var(--coral);
-  font-size: 0.74rem;
+  font-size: 0.86rem;
   font-weight: 800;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -348,10 +348,11 @@ button {
 }
 
 .toolbar h2,
-.create-panel h2,
+.column-heading h2,
 .auth-dialog h2 {
-  margin: 4px 0 0;
-  font-size: 1.55rem;
+  margin: 6px 0 0;
+  font-size: 2rem;
+  line-height: 1.15;
   letter-spacing: 0;
 }
 
@@ -399,16 +400,63 @@ button {
   font-size: 0.94rem;
 }
 
+.match-filter-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 18px;
+  align-items: end;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 18px;
+}
+
+.match-filter-panel .city-field {
+  margin-top: 0;
+}
+
+.match-city-toggle {
+  grid-template-columns: repeat(6, minmax(78px, 1fr));
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.match-district-field {
+  width: 220px;
+  min-width: 0;
+  max-width: 220px;
+}
+
 .content-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 380px;
-  gap: 18px;
+  gap: 28px;
   align-items: start;
+}
+
+.match-column,
+.create-column {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+}
+
+.column-heading {
+  min-height: 68px;
 }
 
 .match-list {
   display: grid;
-  gap: 12px;
+  gap: 16px;
+}
+
+.empty-state {
+  border: 1px dashed #c7d8cf;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.64);
+  color: var(--muted);
+  padding: 18px;
+  text-align: center;
 }
 
 .match-card,
@@ -422,10 +470,10 @@ button {
 .match-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 16px;
+  gap: 22px;
   align-items: center;
-  min-height: 124px;
-  padding: 18px;
+  min-height: 136px;
+  padding: 24px;
 }
 
 .match-card h3 {
@@ -448,7 +496,7 @@ button {
   flex-wrap: wrap;
   justify-content: flex-end;
   max-width: 240px;
-  gap: 8px;
+  gap: 10px;
 }
 
 .match-meta span {
@@ -464,7 +512,7 @@ button {
   border-radius: 999px;
   background: var(--accent);
   color: var(--navy);
-  padding: 0 18px;
+  padding: 0 22px;
   font-weight: 800;
 }
 
@@ -681,6 +729,15 @@ textarea:disabled {
   .city-toggle {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .match-filter-panel {
+    grid-template-columns: minmax(0, 1fr) 220px;
+    overflow-x: auto;
+  }
+
+  .match-city-toggle {
+    grid-template-columns: repeat(6, minmax(78px, 1fr));
+  }
 }
 
 @media (max-width: 520px) {
@@ -722,6 +779,10 @@ textarea:disabled {
 
   .city-toggle {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .match-city-toggle {
+    grid-template-columns: repeat(6, minmax(78px, 1fr));
   }
 
   .user-pill {
