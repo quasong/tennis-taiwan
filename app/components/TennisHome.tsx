@@ -500,6 +500,15 @@ export default function TennisHome() {
     }
   }
 
+  function handleCitySelect(city: string) {
+    setSelectedCity(city);
+    setSelectedDistrict("");
+    setSelectedCourtId("");
+    setCourts([]);
+    setCourtsStatus("正在載入球場...");
+    setCreateStatus("");
+  }
+
   async function handleCreateMatch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setCreateStatus("");
@@ -638,20 +647,6 @@ export default function TennisHome() {
             <p className="eyebrow">Open matches</p>
             <h2>近期球局</h2>
           </div>
-          <div className="filters" aria-label="篩選條件">
-            <button className="filter-chip active" type="button">
-              全台
-            </button>
-            <button className="filter-chip" type="button">
-              台北
-            </button>
-            <button className="filter-chip" type="button">
-              台中
-            </button>
-            <button className="filter-chip" type="button">
-              高雄
-            </button>
-          </div>
         </div>
 
         <div className="content-grid">
@@ -678,32 +673,24 @@ export default function TennisHome() {
           <aside className="create-panel" aria-label="建立球局">
             <p className="eyebrow">Create</p>
             <h2>發起新球局</h2>
+            <div className="city-field">
+              <span className="field-caption">選擇城市</span>
+              <div className="city-toggle" aria-label="選擇城市">
+                {municipalities.map(({ city }) => (
+                  <button
+                    className={`filter-chip ${
+                      selectedCity === city ? "active" : ""
+                    }`}
+                    key={city}
+                    onClick={() => handleCitySelect(city)}
+                    type="button"
+                  >
+                    {city}
+                  </button>
+                ))}
+              </div>
+            </div>
             <form className="compact-form" onSubmit={handleCreateMatch}>
-              <label>
-                城市
-                <select
-                  onChange={(event) => {
-                    setSelectedCity(event.target.value);
-                    setSelectedDistrict("");
-                    setSelectedCourtId("");
-                    setCourts([]);
-                    setCourtsStatus(
-                      event.target.value ? "正在載入球場..." : ""
-                    );
-                    setCreateStatus("");
-                  }}
-                  required
-                  value={selectedCity}
-                >
-                  <option value="">選擇城市</option>
-                  {municipalities.map(({ city }) => (
-                    <option key={city} value={city}>
-                      {city}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
               <label>
                 行政區
                 <select

@@ -374,9 +374,34 @@ button {
   color: #fff;
 }
 
+.city-field {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.field-caption {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.city-toggle {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.city-toggle .filter-chip {
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 8px;
+  font-size: 0.94rem;
+}
+
 .content-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-columns: minmax(0, 1fr) 380px;
   gap: 18px;
   align-items: start;
 }
@@ -444,14 +469,14 @@ button {
 }
 
 .create-panel {
-  padding: 20px;
+  padding: 24px;
 }
 
 .compact-form,
 .auth-form {
   display: grid;
   gap: 14px;
-  margin-top: 18px;
+  margin-top: 20px;
 }
 
 label {
@@ -652,6 +677,10 @@ textarea:disabled {
   .match-meta {
     justify-content: flex-start;
   }
+
+  .city-toggle {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 520px) {
@@ -689,6 +718,10 @@ textarea:disabled {
 
   .court-frame {
     min-height: 210px;
+  }
+
+  .city-toggle {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .user-pill {
