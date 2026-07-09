@@ -314,7 +314,7 @@ export default function TennisHome() {
   const [statusMessage, setStatusMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [courts, setCourts] = useState<Court[]>([]);
-  const [courtsStatus, setCourtsStatus] = useState("正在載入球場...");
+  const [courtsStatus, setCourtsStatus] = useState("");
   const [selectedCity, setSelectedCity] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
   const [selectedCourtId, setSelectedCourtId] = useState("");
@@ -335,37 +335,6 @@ export default function TennisHome() {
     [authSnapshot]
   );
 
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadCourts() {
-      try {
-        const response = await fetch("/api/courts");
-        const data = (await response.json()) as CourtsResponse;
-
-        if (!isMounted) return;
-
-        if (!response.ok) {
-          setCourtsStatus(data.message ?? data.error ?? "讀取球場資料失敗。");
-          return;
-        }
-
-        setCourts(data.courts ?? []);
-        setCourtsStatus("");
-      } catch {
-        if (isMounted) {
-          setCourtsStatus("無法讀取球場資料，請稍後再試。");
-        }
-      }
-    }
-
-    loadCourts();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
   const dialogTitle = authMode === "register" ? "建立帳號" : "登入帳號";
   const primaryText = authMode === "register" ? "送出註冊" : "登入";
 
@@ -383,18 +352,59 @@ export default function TennisHome() {
     );
   }, [selectedCity]);
 
-  const filteredCourts = useMemo(() => {
-    return courts.filter((court) => {
-      if (selectedCity && court.city !== selectedCity) return false;
-      if (selectedDistrict && court.district !== selectedDistrict) return false;
-      return Boolean(selectedCity);
-    });
-  }, [courts, selectedCity, selectedDistrict]);
-
   const selectedCourt = useMemo(
     () => courts.find((court) => court.id === selectedCourtId),
     [courts, selectedCourtId]
   );
+
+  const courtPlaceholder = useMemo(() => {
+    if (!selectedCity) return "請先選擇城市";
+    if (courtsStatus) return courtsStatus;
+    return "選擇球場";
+  }, [courtsStatus, selectedCity]);
+
+  useEffect(() => {
+    if (!selectedCity) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const params = new URLSearchParams({ city: selectedCity });
+
+    if (selectedDistrict) {
+      params.set("district", selectedDistrict);
+    }
+
+    async function loadCourts() {
+      try {
+        const response = await fetch(`/api/courts?${params.toString()}`, {
+          signal: controller.signal,
+        });
+        const data = (await response.json()) as CourtsResponse;
+
+        if (!response.ok) {
+          setCourtsStatus(data.message ?? data.error ?? "讀取球場資料失敗。");
+          return;
+        }
+
+        const nextCourts = data.courts ?? [];
+        setCourts(nextCourts);
+        setCourtsStatus(nextCourts.length > 0 ? "" : "這個條件目前沒有球場。");
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+
+        setCourtsStatus("無法讀取球場資料，請稍後再試。");
+      }
+    }
+
+    loadCourts();
+
+    return () => {
+      controller.abort();
+    };
+  }, [selectedCity, selectedDistrict]);
 
   function resetForm(nextMode: AuthMode) {
     setAuthMode(nextMode);
@@ -676,6 +686,10 @@ export default function TennisHome() {
                     setSelectedCity(event.target.value);
                     setSelectedDistrict("");
                     setSelectedCourtId("");
+                    setCourts([]);
+                    setCourtsStatus(
+                      event.target.value ? "正在載入球場..." : ""
+                    );
                     setCreateStatus("");
                   }}
                   required
@@ -697,6 +711,8 @@ export default function TennisHome() {
                   onChange={(event) => {
                     setSelectedDistrict(event.target.value);
                     setSelectedCourtId("");
+                    setCourts([]);
+                    setCourtsStatus("正在載入球場...");
                     setCreateStatus("");
                   }}
                   value={selectedDistrict}
@@ -713,7 +729,7 @@ export default function TennisHome() {
               <label>
                 球場
                 <select
-                  disabled={!selectedCity || filteredCourts.length === 0}
+                  disabled={!selectedCity}
                   onChange={(event) => {
                     setSelectedCourtId(event.target.value);
                     setCreateStatus("");
@@ -721,10 +737,8 @@ export default function TennisHome() {
                   required
                   value={selectedCourtId}
                 >
-                  <option value="">
-                    {selectedCity ? "選擇球場" : "請先選擇城市"}
-                  </option>
-                  {filteredCourts.map((court) => (
+                  <option value="">{courtPlaceholder}</option>
+                  {courts.map((court) => (
                     <option key={court.id} value={court.id}>
                       {court.name}
                       {court.district ? `｜${court.district}` : ""}
