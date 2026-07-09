@@ -5,16 +5,21 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
-);
-
 export default function AuthCallbackPage() {
     const [message, setMessage] = useState("正在確認 Email...");
 
     useEffect(() => {
         async function handleCallback() {
+            const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+            const supabasePublishableKey =
+                process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+            if (!supabaseUrl || !supabasePublishableKey) {
+                setMessage("Supabase 環境變數尚未設定。");
+                return;
+            }
+
+            const supabase = createClient(supabaseUrl, supabasePublishableKey);
             const hash = new URLSearchParams(window.location.hash.slice(1));
 
             const error = hash.get("error");
@@ -46,10 +51,8 @@ export default function AuthCallbackPage() {
     }, []);
 
     return (
-        <html><body>
-        <main style={{ padding: 32 }}>
+        <main className="callback-page">
             <h1>{message}</h1>
         </main>
-        </body></html>
     );
 }
