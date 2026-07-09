@@ -411,7 +411,7 @@ button {
 
 .match-filter-panel {
   display: flex;
-  gap: 18px;
+  gap: 14px;
   align-items: end;
   flex-wrap: nowrap;
   border: 1px solid var(--line);
@@ -429,21 +429,21 @@ button {
 .match-city-toggle {
   display: flex;
   flex-wrap: nowrap;
-  gap: 8px;
-  overflow-x: auto;
+  gap: 6px;
+  overflow-x: visible;
   padding-bottom: 2px;
 }
 
 .match-city-toggle .filter-chip {
-  flex: 1 0 88px;
-  min-width: 88px;
+  flex: 1 1 0;
+  min-width: 64px;
 }
 
 .match-district-field {
-  flex: 0 0 220px;
-  width: 220px;
+  flex: 0 0 160px;
+  width: 80px;
   min-width: 0;
-  max-width: 220px;
+  max-width: 160px;
 }
 
 .content-grid {
@@ -750,7 +750,7 @@ textarea:disabled {
   }
 
   .match-filter-panel {
-    overflow-x: auto;
+    overflow-x: visible;
   }
 }
 
