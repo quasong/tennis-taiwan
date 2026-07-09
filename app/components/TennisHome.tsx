@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  FormEvent,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 type AuthMode = "login" | "register";
 
@@ -25,7 +31,218 @@ type ApiResponse = {
   };
 };
 
+type Court = {
+  id: string;
+  name: string;
+  city: string;
+  district: string | null;
+  address: string | null;
+  surface: string | null;
+};
+
+type CourtsResponse = {
+  courts?: Court[];
+  message?: string;
+  error?: string;
+};
+
+type MatchResponse = {
+  message?: string;
+  error?: string;
+};
+
 const STORAGE_KEY = "tennis-taiwan-user";
+
+const municipalities = [
+  {
+    city: "台北",
+    districts: [
+      "中正區",
+      "大同區",
+      "中山區",
+      "松山區",
+      "大安區",
+      "萬華區",
+      "信義區",
+      "士林區",
+      "北投區",
+      "內湖區",
+      "南港區",
+      "文山區",
+    ],
+  },
+  {
+    city: "新北",
+    districts: [
+      "板橋區",
+      "三重區",
+      "中和區",
+      "永和區",
+      "新莊區",
+      "新店區",
+      "樹林區",
+      "鶯歌區",
+      "三峽區",
+      "淡水區",
+      "汐止區",
+      "瑞芳區",
+      "土城區",
+      "蘆洲區",
+      "五股區",
+      "泰山區",
+      "林口區",
+      "深坑區",
+      "石碇區",
+      "坪林區",
+      "三芝區",
+      "石門區",
+      "八里區",
+      "平溪區",
+      "雙溪區",
+      "貢寮區",
+      "金山區",
+      "萬里區",
+      "烏來區",
+    ],
+  },
+  {
+    city: "桃園",
+    districts: [
+      "桃園區",
+      "中壢區",
+      "平鎮區",
+      "八德區",
+      "楊梅區",
+      "蘆竹區",
+      "大溪區",
+      "龍潭區",
+      "龜山區",
+      "大園區",
+      "觀音區",
+      "新屋區",
+      "復興區",
+    ],
+  },
+  {
+    city: "台中",
+    districts: [
+      "中區",
+      "東區",
+      "南區",
+      "西區",
+      "北區",
+      "北屯區",
+      "西屯區",
+      "南屯區",
+      "太平區",
+      "大里區",
+      "霧峰區",
+      "烏日區",
+      "豐原區",
+      "后里區",
+      "石岡區",
+      "東勢區",
+      "和平區",
+      "新社區",
+      "潭子區",
+      "大雅區",
+      "神岡區",
+      "大肚區",
+      "沙鹿區",
+      "龍井區",
+      "梧棲區",
+      "清水區",
+      "大甲區",
+      "外埔區",
+      "大安區",
+    ],
+  },
+  {
+    city: "台南",
+    districts: [
+      "中西區",
+      "東區",
+      "南區",
+      "北區",
+      "安平區",
+      "安南區",
+      "永康區",
+      "歸仁區",
+      "新化區",
+      "左鎮區",
+      "玉井區",
+      "楠西區",
+      "南化區",
+      "仁德區",
+      "關廟區",
+      "龍崎區",
+      "官田區",
+      "麻豆區",
+      "佳里區",
+      "西港區",
+      "七股區",
+      "將軍區",
+      "學甲區",
+      "北門區",
+      "新營區",
+      "後壁區",
+      "白河區",
+      "東山區",
+      "六甲區",
+      "下營區",
+      "柳營區",
+      "鹽水區",
+      "善化區",
+      "大內區",
+      "山上區",
+      "新市區",
+      "安定區",
+    ],
+  },
+  {
+    city: "高雄",
+    districts: [
+      "新興區",
+      "前金區",
+      "苓雅區",
+      "鹽埕區",
+      "鼓山區",
+      "旗津區",
+      "前鎮區",
+      "三民區",
+      "楠梓區",
+      "小港區",
+      "左營區",
+      "仁武區",
+      "大社區",
+      "岡山區",
+      "路竹區",
+      "阿蓮區",
+      "田寮區",
+      "燕巢區",
+      "橋頭區",
+      "梓官區",
+      "彌陀區",
+      "永安區",
+      "湖內區",
+      "鳳山區",
+      "大寮區",
+      "林園區",
+      "鳥松區",
+      "大樹區",
+      "旗山區",
+      "美濃區",
+      "六龜區",
+      "內門區",
+      "杉林區",
+      "甲仙區",
+      "桃源區",
+      "那瑪夏區",
+      "茂林區",
+      "茄萣區",
+    ],
+  },
+] as const;
 
 const sampleMatches = [
   {
@@ -96,6 +313,17 @@ export default function TennisHome() {
   const [ntrpLevel, setNtrpLevel] = useState("3.0");
   const [statusMessage, setStatusMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [courts, setCourts] = useState<Court[]>([]);
+  const [courtsStatus, setCourtsStatus] = useState("正在載入球場...");
+  const [selectedCity, setSelectedCity] = useState("");
+  const [selectedDistrict, setSelectedDistrict] = useState("");
+  const [selectedCourtId, setSelectedCourtId] = useState("");
+  const [matchTime, setMatchTime] = useState("");
+  const [maxPlayers, setMaxPlayers] = useState("4");
+  const [fee, setFee] = useState("0");
+  const [notes, setNotes] = useState("");
+  const [createStatus, setCreateStatus] = useState("");
+  const [isCreatingMatch, setIsCreatingMatch] = useState(false);
   const authSnapshot = useSyncExternalStore(
     subscribeToAuthStore,
     getAuthSnapshot,
@@ -107,6 +335,37 @@ export default function TennisHome() {
     [authSnapshot]
   );
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadCourts() {
+      try {
+        const response = await fetch("/api/courts");
+        const data = (await response.json()) as CourtsResponse;
+
+        if (!isMounted) return;
+
+        if (!response.ok) {
+          setCourtsStatus(data.message ?? data.error ?? "讀取球場資料失敗。");
+          return;
+        }
+
+        setCourts(data.courts ?? []);
+        setCourtsStatus("");
+      } catch {
+        if (isMounted) {
+          setCourtsStatus("無法讀取球場資料，請稍後再試。");
+        }
+      }
+    }
+
+    loadCourts();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const dialogTitle = authMode === "register" ? "建立帳號" : "登入帳號";
   const primaryText = authMode === "register" ? "送出註冊" : "登入";
 
@@ -114,6 +373,28 @@ export default function TennisHome() {
     const source = currentUser?.name || currentUser?.email || "T";
     return source.slice(0, 1).toUpperCase();
   }, [currentUser]);
+
+  const districtOptions = useMemo(() => {
+    if (!selectedCity) return [];
+
+    return (
+      municipalities.find((municipality) => municipality.city === selectedCity)
+        ?.districts ?? []
+    );
+  }, [selectedCity]);
+
+  const filteredCourts = useMemo(() => {
+    return courts.filter((court) => {
+      if (selectedCity && court.city !== selectedCity) return false;
+      if (selectedDistrict && court.district !== selectedDistrict) return false;
+      return Boolean(selectedCity);
+    });
+  }, [courts, selectedCity, selectedDistrict]);
+
+  const selectedCourt = useMemo(
+    () => courts.find((court) => court.id === selectedCourtId),
+    [courts, selectedCourtId]
+  );
 
   function resetForm(nextMode: AuthMode) {
     setAuthMode(nextMode);
@@ -206,6 +487,57 @@ export default function TennisHome() {
       setNickname("");
       setStatusMessage("");
       setAuthMode(null);
+    }
+  }
+
+  async function handleCreateMatch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setCreateStatus("");
+
+    if (!currentUser) {
+      resetForm("login");
+      setCreateStatus("請先登入後再建立球局。");
+      return;
+    }
+
+    if (!selectedCity || !selectedCourtId || !matchTime) {
+      setCreateStatus("請選擇城市、球場和時間。");
+      return;
+    }
+
+    setIsCreatingMatch(true);
+
+    try {
+      const response = await fetch("/api/matches", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          courtId: selectedCourtId,
+          matchTime,
+          maxPlayers: Number(maxPlayers),
+          fee: Number(fee || 0),
+          notes,
+        }),
+      });
+      const data = (await response.json()) as MatchResponse;
+
+      if (!response.ok) {
+        setCreateStatus(data.message ?? data.error ?? "建立球局失敗。");
+        return;
+      }
+
+      setCreateStatus(data.message ?? "約球建立成功。");
+      setSelectedCourtId("");
+      setMatchTime("");
+      setFee("0");
+      setNotes("");
+    } catch {
+      setCreateStatus("網路連線異常，請稍後再試。");
+    } finally {
+      setIsCreatingMatch(false);
     }
   }
 
@@ -336,26 +668,142 @@ export default function TennisHome() {
           <aside className="create-panel" aria-label="建立球局">
             <p className="eyebrow">Create</p>
             <h2>發起新球局</h2>
-            <div className="compact-form">
+            <form className="compact-form" onSubmit={handleCreateMatch}>
+              <label>
+                城市
+                <select
+                  onChange={(event) => {
+                    setSelectedCity(event.target.value);
+                    setSelectedDistrict("");
+                    setSelectedCourtId("");
+                    setCreateStatus("");
+                  }}
+                  required
+                  value={selectedCity}
+                >
+                  <option value="">選擇城市</option>
+                  {municipalities.map(({ city }) => (
+                    <option key={city} value={city}>
+                      {city}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                行政區
+                <select
+                  disabled={!selectedCity || districtOptions.length === 0}
+                  onChange={(event) => {
+                    setSelectedDistrict(event.target.value);
+                    setSelectedCourtId("");
+                    setCreateStatus("");
+                  }}
+                  value={selectedDistrict}
+                >
+                  <option value="">不限行政區</option>
+                  {districtOptions.map((district) => (
+                    <option key={district} value={district}>
+                      {district}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
               <label>
                 球場
-                <input placeholder="例：台北青年公園網球場" />
+                <select
+                  disabled={!selectedCity || filteredCourts.length === 0}
+                  onChange={(event) => {
+                    setSelectedCourtId(event.target.value);
+                    setCreateStatus("");
+                  }}
+                  required
+                  value={selectedCourtId}
+                >
+                  <option value="">
+                    {selectedCity ? "選擇球場" : "請先選擇城市"}
+                  </option>
+                  {filteredCourts.map((court) => (
+                    <option key={court.id} value={court.id}>
+                      {court.name}
+                      {court.district ? `｜${court.district}` : ""}
+                    </option>
+                  ))}
+                </select>
               </label>
+
+              {selectedCourt ? (
+                <div className="court-detail">
+                  <strong>{selectedCourt.name}</strong>
+                  <span>{selectedCourt.address ?? "尚未提供地址"}</span>
+                  <small>
+                    {selectedCourt.city}
+                    {selectedCourt.district ? ` / ${selectedCourt.district}` : ""}
+                    {selectedCourt.surface ? ` / ${selectedCourt.surface}` : ""}
+                  </small>
+                </div>
+              ) : null}
+
               <label>
                 時間
-                <input type="datetime-local" />
+                <input
+                  onChange={(event) => setMatchTime(event.target.value)}
+                  required
+                  type="datetime-local"
+                  value={matchTime}
+                />
               </label>
               <label>
                 人數
-                <select defaultValue="4">
+                <select
+                  onChange={(event) => setMaxPlayers(event.target.value)}
+                  value={maxPlayers}
+                >
                   <option value="2">2 人</option>
+                  <option value="3">3 人</option>
                   <option value="4">4 人</option>
                 </select>
               </label>
-              <button className="solid-button full-width" type="button">
-                {currentUser ? "建立球局" : "登入後建立"}
+
+              <label>
+                每人費用
+                <input
+                  min="0"
+                  onChange={(event) => setFee(event.target.value)}
+                  step="1"
+                  type="number"
+                  value={fee}
+                />
+              </label>
+
+              <label>
+                備註
+                <textarea
+                  onChange={(event) => setNotes(event.target.value)}
+                  placeholder="例：雙打、程度 3.0 以上、歡迎新朋友"
+                  rows={3}
+                  value={notes}
+                />
+              </label>
+
+              {courtsStatus || createStatus ? (
+                <p className="form-message" role="status">
+                  {createStatus || courtsStatus}
+                </p>
+              ) : null}
+
+              <button
+                className="solid-button full-width"
+                disabled={isCreatingMatch || Boolean(courtsStatus)}
+              >
+                {isCreatingMatch
+                  ? "建立中..."
+                  : currentUser
+                    ? "建立球局"
+                    : "登入後建立"}
               </button>
-            </div>
+            </form>
           </aside>
         </div>
       </section>
