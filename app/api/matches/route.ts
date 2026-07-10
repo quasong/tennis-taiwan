@@ -320,10 +320,38 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        const { data: participant, error: participantError } = await supabase
+            .from("match_participants")
+            .insert({
+                match_id: newMatch.id,
+                user_id: userId,
+                role: "創建者",
+                status: "已加入",
+            })
+            .select()
+            .single();
+
+        if (participantError) {
+            const { error: cleanupError } = await supabase
+                .from("matches")
+                .delete()
+                .eq("id", newMatch.id);
+
+            return NextResponse.json(
+                {
+                    message: "建立約球失敗，無法寫入創建者參加紀錄。",
+                    error: participantError.message,
+                    cleanupError: cleanupError?.message,
+                },
+                { status: 500 }
+            );
+        }
+
         return NextResponse.json(
             {
                 message: "約球建立成功。",
                 match: newMatch,
+                participant,
             },
             { status: 201 }
         );
