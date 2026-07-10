@@ -269,6 +269,7 @@ function MatchCard({
   onJoinMatch,
 }: MatchCardProps) {
   const isHost = currentUser?.id === match.host.id;
+  const isFull = match.status === "已滿團";
 
   return (
     <article className="match-card">
@@ -291,6 +292,10 @@ function MatchCard({
           type="button"
         >
           {isCancelling ? "取消中" : "取消"}
+        </button>
+      ) : isFull ? (
+        <button className="full-match-button" disabled type="button">
+          已滿團
         </button>
       ) : (
         <button

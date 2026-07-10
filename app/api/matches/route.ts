@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
             .select(
                 "id, host_user_id, court_id, play_time, required_players, joined_players, estimated_fee_per_person, note, status, created_at"
             )
-            .eq("status", "徵求中")
+            .in("status", ["徵求中", "已滿團"])
             .order("play_time", { ascending: true });
 
         if (scopedCourts) {

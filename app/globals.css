@@ -113,6 +113,7 @@ button {
 .filter-chip,
 .join-button,
 .cancel-match-button,
+.full-match-button,
 .icon-button,
 .text-button {
   min-height: 40px;
@@ -153,6 +154,7 @@ button {
 .filter-chip:hover,
 .join-button:hover,
 .cancel-match-button:hover,
+.full-match-button:hover,
 .icon-button:hover,
 .text-button:hover {
   transform: translateY(-1px);
@@ -552,6 +554,22 @@ button {
 .join-button:disabled {
   cursor: wait;
   opacity: 0.7;
+}
+
+.full-match-button {
+  border-radius: 999px;
+  background: #e9efec;
+  color: var(--muted);
+  padding: 0 22px;
+  font-weight: 800;
+}
+
+.full-match-button:disabled {
+  cursor: not-allowed;
+}
+
+.full-match-button:disabled:hover {
+  transform: none;
 }
 
 .cancel-match-button {
