@@ -500,16 +500,28 @@ button {
 
 .match-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 22px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: clamp(24px, 3vw, 48px);
   align-items: center;
-  min-height: 136px;
-  padding: 24px;
+  min-height: 170px;
+  padding: 30px 34px;
+}
+
+.match-card-content {
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+}
+
+.match-primary {
+  min-width: 0;
 }
 
 .match-card h3 {
-  margin: 3px 0 6px;
-  font-size: 1.08rem;
+  margin: 8px 0 0;
+  color: var(--ink);
+  font-size: clamp(1.22rem, 1.5vw, 1.5rem);
+  line-height: 1.25;
 }
 
 .match-card p {
@@ -517,16 +529,62 @@ button {
   color: var(--muted);
 }
 
-.match-time {
-  color: var(--coral);
+.match-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 22px;
+  min-width: 0;
+  margin: 0;
+}
+
+.match-detail-row {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.match-detail-row dt {
+  color: var(--muted);
+  font-size: 0.78rem;
   font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.match-detail-row dd {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.match-note-row {
+  grid-column: 1 / -1;
+}
+
+.match-note-row dd {
+  line-height: 1.55;
+}
+
+.match-time {
+  color: var(--muted);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.match-action-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  min-width: max-content;
 }
 
 .match-meta {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  max-width: 240px;
+  max-width: 260px;
   gap: 10px;
 }
 
@@ -787,6 +845,18 @@ textarea:disabled {
     grid-template-columns: 1fr;
   }
 
+  .match-card-content {
+    grid-template-columns: 1fr;
+  }
+
+  .match-action-area {
+    align-items: flex-start;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    min-width: 0;
+  }
+
   .toolbar {
     flex-direction: column;
   }
@@ -825,6 +895,10 @@ textarea:disabled {
   .match-district-field {
     width: 100%;
     max-width: none;
+  }
+
+  .match-details {
+    grid-template-columns: 1fr;
   }
 }
 

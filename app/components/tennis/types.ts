@@ -46,6 +46,7 @@ export type MatchSummary = {
   requiredPlayers: number;
   joinedPlayers: number;
   feePerPerson: number;
+  note: string | null;
   status: string;
   court: {
     id: string;
@@ -55,6 +56,7 @@ export type MatchSummary = {
   } | null;
   host: {
     id: string;
+    email: string;
     nickname: string;
   };
 };

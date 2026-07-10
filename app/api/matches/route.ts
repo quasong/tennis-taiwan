@@ -207,6 +207,7 @@ export async function GET(request: NextRequest) {
                             : null,
                         host: {
                             id: match.host_user_id,
+                            email: host?.email ?? "",
                             nickname:
                                 host?.nickname ?? host?.email ?? "未命名球友",
                         },

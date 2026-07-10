@@ -273,40 +273,60 @@ function MatchCard({
 
   return (
     <article className="match-card">
-      <div>
-        <p className="match-time">{formatMatchTime(match.playTime)}</p>
-        <h3>{match.court?.name ?? "未知球場"}</h3>
-        <p>創建者：{match.host.nickname}</p>
+      <div className="match-card-content">
+        <div className="match-primary">
+          <p className="match-time">{formatMatchTime(match.playTime)}</p>
+          <h3>{match.court?.name ?? "未知球場"}</h3>
+        </div>
+
+        <dl className="match-details" aria-label="球局資訊">
+          <div className="match-detail-row">
+            <dt>創建者</dt>
+            <dd>{match.host.nickname}</dd>
+          </div>
+          <div className="match-detail-row">
+            <dt>信箱</dt>
+            <dd>{match.host.email || "未提供"}</dd>
+          </div>
+          {match.note ? (
+            <div className="match-detail-row match-note-row">
+              <dt>備註</dt>
+              <dd>{match.note}</dd>
+            </div>
+          ) : null}
+        </dl>
       </div>
-      <div className="match-meta">
-        <span className="player-count">
-          {match.joinedPlayers} / {match.requiredPlayers} 人
-        </span>
-        <span>{formatFee(match.feePerPerson)} / 人</span>
+      <div className="match-action-area">
+        <div className="match-meta">
+          <span className="player-count">
+            {match.joinedPlayers} / {match.requiredPlayers} 人
+          </span>
+          <span>{formatFee(match.feePerPerson)} / 人</span>
+        </div>
+        {isHost ? (
+          <button
+            className="cancel-match-button"
+            disabled={isCancelling}
+            onClick={() => onCancelMatch(match.id)}
+            type="button"
+          >
+            {isCancelling ? "取消中" : "取消"}
+          </button>
+        ) : isFull ? (
+          <button className="full-match-button" disabled type="button">
+            已滿團
+          </button>
+        ) : (
+          <button
+            className="join-button"
+            disabled={isJoining}
+            onClick={() => onJoinMatch(match.id)}
+            type="button"
+          >
+            {isJoining ? "加入中" : "加入"}
+          </button>
+        )}
       </div>
-      {isHost ? (
-        <button
-          className="cancel-match-button"
-          disabled={isCancelling}
-          onClick={() => onCancelMatch(match.id)}
-          type="button"
-        >
-          {isCancelling ? "取消中" : "取消"}
-        </button>
-      ) : isFull ? (
-        <button className="full-match-button" disabled type="button">
-          已滿團
-        </button>
-      ) : (
-        <button
-          className="join-button"
-          disabled={isJoining}
-          onClick={() => onJoinMatch(match.id)}
-          type="button"
-        >
-          {isJoining ? "加入中" : "加入"}
-        </button>
-      )}
     </article>
   );
 }
