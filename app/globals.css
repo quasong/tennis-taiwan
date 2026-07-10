@@ -565,10 +565,10 @@ button {
   margin-top: 8px;
 }
 
-.match-address-link {
+.match-address-link,
+.match-email-link {
   display: inline-flex;
   align-items: center;
-  max-width: min(42vw, 420px);
   min-width: 0;
   border-radius: 999px;
   background: #eef5ef;
@@ -581,7 +581,16 @@ button {
   overflow-wrap: anywhere;
 }
 
-.match-address-link:hover {
+.match-address-link {
+  max-width: min(42vw, 420px);
+}
+
+.match-email-link {
+  max-width: 100%;
+}
+
+.match-address-link:hover,
+.match-email-link:hover {
   background: #fff7d6;
   color: var(--navy);
 }

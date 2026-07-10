@@ -325,6 +325,7 @@ function MatchCard({
   const isHost = currentUser?.id === match.host.id;
   const isFull = match.status === "已滿團";
   const courtAddress = match.court?.address?.trim();
+  const hostEmail = match.host.email.trim();
   const mapsUrl = courtAddress
     ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
         courtAddress
@@ -358,7 +359,15 @@ function MatchCard({
           </div>
           <div className="match-detail-row">
             <dt>信箱</dt>
-            <dd>{match.host.email || "未提供"}</dd>
+            <dd>
+              {hostEmail ? (
+                <a className="match-email-link" href={`mailto:${hostEmail}`}>
+                  {hostEmail}
+                </a>
+              ) : (
+                "未提供"
+              )}
+            </dd>
           </div>
           {match.note ? (
             <div className="match-detail-row match-note-row">
