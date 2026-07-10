@@ -1,15 +1,28 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatFee, formatMatchTime } from "./format";
 import { municipalities } from "./locations";
-import type { MatchesResponse, MatchSummary } from "./types";
+import type {
+  MatchResponse,
+  MatchesResponse,
+  MatchSummary,
+  StoredUser,
+} from "./types";
 
 type MatchesSectionProps = {
+  currentUser: StoredUser | null;
   refreshKey: number;
+  onMatchesChanged: () => void;
 };
 
-export function MatchesSection({ refreshKey }: MatchesSectionProps) {
+export function MatchesSection({
+  currentUser,
+  refreshKey,
+  onMatchesChanged,
+}: MatchesSectionProps) {
   const [openMatches, setOpenMatches] = useState<MatchSummary[]>([]);
   const [matchesStatus, setMatchesStatus] = useState("正在載入球局...");
+  const [actionStatus, setActionStatus] = useState("");
+  const [cancellingMatchId, setCancellingMatchId] = useState<string | null>(null);
   const [selectedMatchCity, setSelectedMatchCity] = useState("");
   const [selectedMatchDistrict, setSelectedMatchDistrict] = useState("");
 
@@ -75,12 +88,51 @@ export function MatchesSection({ refreshKey }: MatchesSectionProps) {
     setSelectedMatchDistrict("");
     setOpenMatches([]);
     setMatchesStatus("正在載入球局...");
+    setActionStatus("");
   }
 
   function handleMatchDistrictSelect(district: string) {
     setSelectedMatchDistrict(district);
     setOpenMatches([]);
     setMatchesStatus("正在載入球局...");
+    setActionStatus("");
+  }
+
+  async function handleCancelMatch(matchId: string) {
+    if (!currentUser) {
+      setActionStatus("請先登入後再取消球局。");
+      return;
+    }
+
+    setActionStatus("");
+    setCancellingMatchId(matchId);
+
+    try {
+      const response = await fetch("/api/matches", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "cancel",
+          matchId,
+          userId: currentUser.id,
+        }),
+      });
+      const data = (await response.json()) as MatchResponse;
+
+      if (!response.ok) {
+        setActionStatus(data.message ?? data.error ?? "取消球局失敗。");
+        return;
+      }
+
+      setActionStatus(data.message ?? "球局已取消。");
+      onMatchesChanged();
+    } catch {
+      setActionStatus("網路連線異常，請稍後再試。");
+    } finally {
+      setCancellingMatchId(null);
+    }
   }
 
   return (
@@ -136,25 +188,68 @@ export function MatchesSection({ refreshKey }: MatchesSectionProps) {
           </div>
         ) : null}
 
+        {actionStatus ? (
+          <div className="inline-status" role="status">
+            {actionStatus}
+          </div>
+        ) : null}
+
         {openMatches.map((match) => (
-          <article className="match-card" key={match.id}>
-            <div>
-              <p className="match-time">{formatMatchTime(match.playTime)}</p>
-              <h3>{match.court?.name ?? "未知球場"}</h3>
-              <p>創建者：{match.host.nickname}</p>
-            </div>
-            <div className="match-meta">
-              <span className="player-count">
-                {match.joinedPlayers} / {match.requiredPlayers} 人
-              </span>
-              <span>{formatFee(match.feePerPerson)} / 人</span>
-            </div>
-            <button className="join-button" type="button">
-              加入
-            </button>
-          </article>
+          <MatchCard
+            currentUser={currentUser}
+            isCancelling={cancellingMatchId === match.id}
+            key={match.id}
+            match={match}
+            onCancelMatch={handleCancelMatch}
+          />
         ))}
       </div>
     </section>
+  );
+}
+
+type MatchCardProps = {
+  currentUser: StoredUser | null;
+  isCancelling: boolean;
+  match: MatchSummary;
+  onCancelMatch: (matchId: string) => void;
+};
+
+function MatchCard({
+  currentUser,
+  isCancelling,
+  match,
+  onCancelMatch,
+}: MatchCardProps) {
+  const isHost = currentUser?.id === match.host.id;
+
+  return (
+    <article className="match-card">
+      <div>
+        <p className="match-time">{formatMatchTime(match.playTime)}</p>
+        <h3>{match.court?.name ?? "未知球場"}</h3>
+        <p>創建者：{match.host.nickname}</p>
+      </div>
+      <div className="match-meta">
+        <span className="player-count">
+          {match.joinedPlayers} / {match.requiredPlayers} 人
+        </span>
+        <span>{formatFee(match.feePerPerson)} / 人</span>
+      </div>
+      {isHost ? (
+        <button
+          className="cancel-match-button"
+          disabled={isCancelling}
+          onClick={() => onCancelMatch(match.id)}
+          type="button"
+        >
+          {isCancelling ? "取消中" : "取消"}
+        </button>
+      ) : (
+        <button className="join-button" type="button">
+          加入
+        </button>
+      )}
+    </article>
   );
 }

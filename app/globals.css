@@ -112,6 +112,7 @@ button {
 .solid-button,
 .filter-chip,
 .join-button,
+.cancel-match-button,
 .icon-button,
 .text-button {
   min-height: 40px;
@@ -151,6 +152,7 @@ button {
 .solid-button:hover,
 .filter-chip:hover,
 .join-button:hover,
+.cancel-match-button:hover,
 .icon-button:hover,
 .text-button:hover {
   transform: translateY(-1px);
@@ -478,6 +480,14 @@ button {
   text-align: center;
 }
 
+.inline-status {
+  border-radius: 8px;
+  background: rgba(255, 247, 214, 0.78);
+  color: var(--navy);
+  padding: 12px 14px;
+  font-weight: 700;
+}
+
 .match-card,
 .create-panel {
   border: 1px solid var(--line);
@@ -537,6 +547,20 @@ button {
   color: var(--navy);
   padding: 0 22px;
   font-weight: 800;
+}
+
+.cancel-match-button {
+  border-radius: 999px;
+  background: #d83a2f;
+  color: #fff;
+  padding: 0 22px;
+  font-weight: 800;
+  box-shadow: 0 12px 24px rgba(216, 58, 47, 0.22);
+}
+
+.cancel-match-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
 }
 
 .create-panel {

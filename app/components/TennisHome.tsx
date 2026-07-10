@@ -142,7 +142,13 @@ export default function TennisHome() {
 
       <section className="workspace" aria-label="約球工作區">
         <div className="content-grid">
-          <MatchesSection refreshKey={matchesRefreshKey} />
+          <MatchesSection
+            currentUser={currentUser}
+            refreshKey={matchesRefreshKey}
+            onMatchesChanged={() =>
+              setMatchesRefreshKey((current) => current + 1)
+            }
+          />
           <CreateMatchPanel
             currentUser={currentUser}
             onMatchCreated={() => setMatchesRefreshKey((current) => current + 1)}

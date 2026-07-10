@@ -14,6 +14,12 @@ type CreateMatchBody = {
     notes?: string;
 };
 
+type CancelMatchBody = {
+    action?: string;
+    matchId?: string;
+    userId?: string;
+};
+
 type CourtRecord = {
     id: string;
     name: string;
@@ -113,6 +119,7 @@ export async function GET(request: NextRequest) {
             .select(
                 "id, host_user_id, court_id, play_time, required_players, joined_players, estimated_fee_per_person, note, status, created_at"
             )
+            .eq("status", "徵求中")
             .order("play_time", { ascending: true });
 
         if (scopedCourts) {
@@ -354,6 +361,135 @@ export async function POST(request: NextRequest) {
                 participant,
             },
             { status: 201 }
+        );
+    } catch (error) {
+        return NextResponse.json(
+            {
+                message: "伺服器發生未預期錯誤。",
+                error: error instanceof Error ? error.message : "Unknown error",
+            },
+            { status: 500 }
+        );
+    }
+}
+
+export async function PATCH(request: NextRequest) {
+    try {
+        const supabaseKey = supabaseServiceRoleKey ?? supabasePublishableKey;
+
+        if (!supabaseUrl || !supabaseKey) {
+            return NextResponse.json(
+                { message: "Supabase environment variables are missing." },
+                { status: 500 }
+            );
+        }
+
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        const body = (await request.json()) as CancelMatchBody;
+        const { action, matchId, userId } = body;
+
+        if (action !== "cancel") {
+            return NextResponse.json(
+                { message: "不支援的球局操作。" },
+                { status: 400 }
+            );
+        }
+
+        if (!matchId || !userId) {
+            return NextResponse.json(
+                { message: "缺少必要欄位。" },
+                { status: 400 }
+            );
+        }
+
+        if (!isValidUuid(matchId) || !isValidUuid(userId)) {
+            return NextResponse.json(
+                { message: "matchId 或 userId 格式不正確。" },
+                { status: 400 }
+            );
+        }
+
+        const { data: existingMatch, error: matchError } = await supabase
+            .from("matches")
+            .select("id, host_user_id, status")
+            .eq("id", matchId)
+            .maybeSingle();
+
+        if (matchError) {
+            return NextResponse.json(
+                { message: "檢查球局時發生錯誤。", error: matchError.message },
+                { status: 500 }
+            );
+        }
+
+        if (!existingMatch) {
+            return NextResponse.json(
+                { message: "找不到指定的球局。" },
+                { status: 404 }
+            );
+        }
+
+        if (existingMatch.host_user_id !== userId) {
+            return NextResponse.json(
+                { message: "只有球局創建者可以取消此球局。" },
+                { status: 403 }
+            );
+        }
+
+        if (existingMatch.status === "已結束") {
+            return NextResponse.json(
+                { message: "球局已經結束。" },
+                { status: 200 }
+            );
+        }
+
+        const { data: updatedMatch, error: updateMatchError } = await supabase
+            .from("matches")
+            .update({ status: "已結束" })
+            .eq("id", matchId)
+            .eq("host_user_id", userId)
+            .select()
+            .single();
+
+        if (updateMatchError) {
+            return NextResponse.json(
+                {
+                    message: "取消球局失敗。",
+                    error: updateMatchError.message,
+                },
+                { status: 500 }
+            );
+        }
+
+        const { error: participantError } = await supabase
+            .from("match_participants")
+            .update({
+                status: "已取消",
+                updated_at: new Date().toISOString(),
+            })
+            .eq("match_id", matchId);
+
+        if (participantError) {
+            await supabase
+                .from("matches")
+                .update({ status: existingMatch.status })
+                .eq("id", matchId);
+
+            return NextResponse.json(
+                {
+                    message: "取消球局失敗，無法更新參與者狀態。",
+                    error: participantError.message,
+                },
+                { status: 500 }
+            );
+        }
+
+        return NextResponse.json(
+            {
+                message: "球局已取消。",
+                match: updatedMatch,
+            },
+            { status: 200 }
         );
     } catch (error) {
         return NextResponse.json(
