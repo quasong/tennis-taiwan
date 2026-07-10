@@ -25,6 +25,7 @@ type CourtRecord = {
     name: string;
     city: string;
     district: string | null;
+    address: string | null;
 };
 
 type MatchRecord = {
@@ -91,7 +92,7 @@ export async function GET(request: NextRequest) {
         if (city) {
             let courtsQuery = supabase
                 .from("courts")
-                .select("id, name, city, district")
+                .select("id, name, city, district, address")
                 .in("city", getCityValues(city));
 
             if (district) {
@@ -157,7 +158,7 @@ export async function GET(request: NextRequest) {
         ] = await Promise.all([
             supabase
                 .from("courts")
-                .select("id, name, city, district")
+                .select("id, name, city, district, address")
                 .in("id", courtIds),
             supabase.from("users").select("id, email, nickname").in("id", userIds),
         ]);
@@ -203,6 +204,7 @@ export async function GET(request: NextRequest) {
                                   name: court.name,
                                   city: court.city,
                                   district: court.district,
+                                  address: court.address,
                               }
                             : null,
                         host: {

@@ -53,6 +53,7 @@ export type MatchSummary = {
     name: string;
     city: string;
     district: string | null;
+    address: string | null;
   } | null;
   host: {
     id: string;

@@ -270,13 +270,31 @@ function MatchCard({
 }: MatchCardProps) {
   const isHost = currentUser?.id === match.host.id;
   const isFull = match.status === "已滿團";
+  const courtAddress = match.court?.address?.trim();
+  const mapsUrl = courtAddress
+    ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+        courtAddress
+      )}`
+    : "";
 
   return (
     <article className="match-card">
       <div className="match-card-content">
         <div className="match-primary">
           <p className="match-time">{formatMatchTime(match.playTime)}</p>
-          <h3>{match.court?.name ?? "未知球場"}</h3>
+          <div className="match-title-row">
+            <h3>{match.court?.name ?? "未知球場"}</h3>
+            {courtAddress ? (
+              <a
+                className="match-address-link"
+                href={mapsUrl}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                {courtAddress}
+              </a>
+            ) : null}
+          </div>
         </div>
 
         <dl className="match-details" aria-label="球局資訊">
