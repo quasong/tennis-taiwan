@@ -12,17 +12,20 @@ type MatchesSectionProps = {
   currentUser: StoredUser | null;
   refreshKey: number;
   onMatchesChanged: () => void;
+  onRequireLogin: () => void;
 };
 
 export function MatchesSection({
   currentUser,
   refreshKey,
   onMatchesChanged,
+  onRequireLogin,
 }: MatchesSectionProps) {
   const [openMatches, setOpenMatches] = useState<MatchSummary[]>([]);
   const [matchesStatus, setMatchesStatus] = useState("正在載入球局...");
   const [actionStatus, setActionStatus] = useState("");
   const [cancellingMatchId, setCancellingMatchId] = useState<string | null>(null);
+  const [joiningMatchId, setJoiningMatchId] = useState<string | null>(null);
   const [selectedMatchCity, setSelectedMatchCity] = useState("");
   const [selectedMatchDistrict, setSelectedMatchDistrict] = useState("");
 
@@ -135,6 +138,44 @@ export function MatchesSection({
     }
   }
 
+  async function handleJoinMatch(matchId: string) {
+    if (!currentUser) {
+      onRequireLogin();
+      setActionStatus("請先登入後再加入球局。");
+      return;
+    }
+
+    setActionStatus("");
+    setJoiningMatchId(matchId);
+
+    try {
+      const response = await fetch("/api/matches", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "join",
+          matchId,
+          userId: currentUser.id,
+        }),
+      });
+      const data = (await response.json()) as MatchResponse;
+
+      if (!response.ok) {
+        setActionStatus(data.message ?? data.error ?? "加入球局失敗。");
+        return;
+      }
+
+      setActionStatus(data.message ?? "已加入球局。");
+      onMatchesChanged();
+    } catch {
+      setActionStatus("網路連線異常，請稍後再試。");
+    } finally {
+      setJoiningMatchId(null);
+    }
+  }
+
   return (
     <section className="match-column" aria-labelledby="matches-title">
       <div className="column-heading">
@@ -198,9 +239,11 @@ export function MatchesSection({
           <MatchCard
             currentUser={currentUser}
             isCancelling={cancellingMatchId === match.id}
+            isJoining={joiningMatchId === match.id}
             key={match.id}
             match={match}
             onCancelMatch={handleCancelMatch}
+            onJoinMatch={handleJoinMatch}
           />
         ))}
       </div>
@@ -211,15 +254,19 @@ export function MatchesSection({
 type MatchCardProps = {
   currentUser: StoredUser | null;
   isCancelling: boolean;
+  isJoining: boolean;
   match: MatchSummary;
   onCancelMatch: (matchId: string) => void;
+  onJoinMatch: (matchId: string) => void;
 };
 
 function MatchCard({
   currentUser,
   isCancelling,
+  isJoining,
   match,
   onCancelMatch,
+  onJoinMatch,
 }: MatchCardProps) {
   const isHost = currentUser?.id === match.host.id;
 
@@ -246,8 +293,13 @@ function MatchCard({
           {isCancelling ? "取消中" : "取消"}
         </button>
       ) : (
-        <button className="join-button" type="button">
-          加入
+        <button
+          className="join-button"
+          disabled={isJoining}
+          onClick={() => onJoinMatch(match.id)}
+          type="button"
+        >
+          {isJoining ? "加入中" : "加入"}
         </button>
       )}
     </article>

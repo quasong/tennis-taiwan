@@ -14,7 +14,7 @@ type CreateMatchBody = {
     notes?: string;
 };
 
-type CancelMatchBody = {
+type MatchActionBody = {
     action?: string;
     matchId?: string;
     userId?: string;
@@ -385,10 +385,10 @@ export async function PATCH(request: NextRequest) {
         }
 
         const supabase = createClient(supabaseUrl, supabaseKey);
-        const body = (await request.json()) as CancelMatchBody;
+        const body = (await request.json()) as MatchActionBody;
         const { action, matchId, userId } = body;
 
-        if (action !== "cancel") {
+        if (action !== "cancel" && action !== "join") {
             return NextResponse.json(
                 { message: "不支援的球局操作。" },
                 { status: 400 }
@@ -411,7 +411,7 @@ export async function PATCH(request: NextRequest) {
 
         const { data: existingMatch, error: matchError } = await supabase
             .from("matches")
-            .select("id, host_user_id, status")
+            .select("id, host_user_id, status, required_players, joined_players")
             .eq("id", matchId)
             .maybeSingle();
 
@@ -426,6 +426,141 @@ export async function PATCH(request: NextRequest) {
             return NextResponse.json(
                 { message: "找不到指定的球局。" },
                 { status: 404 }
+            );
+        }
+
+        if (action === "join") {
+            if (existingMatch.host_user_id === userId) {
+                return NextResponse.json(
+                    { message: "創建者已經在此球局中。" },
+                    { status: 400 }
+                );
+            }
+
+            if (existingMatch.status !== "徵求中") {
+                return NextResponse.json(
+                    { message: "此球局目前無法加入。" },
+                    { status: 409 }
+                );
+            }
+
+            const { data: existingParticipant, error: participantLookupError } =
+                await supabase
+                    .from("match_participants")
+                    .select("id, status")
+                    .eq("match_id", matchId)
+                    .eq("user_id", userId)
+                    .maybeSingle();
+
+            if (participantLookupError) {
+                return NextResponse.json(
+                    {
+                        message: "檢查參與紀錄時發生錯誤。",
+                        error: participantLookupError.message,
+                    },
+                    { status: 500 }
+                );
+            }
+
+            if (existingParticipant?.status === "已加入") {
+                return NextResponse.json(
+                    { message: "你已經加入此球局。" },
+                    { status: 200 }
+                );
+            }
+
+            if (existingMatch.joined_players >= existingMatch.required_players) {
+                return NextResponse.json(
+                    { message: "此球局已滿團。" },
+                    { status: 409 }
+                );
+            }
+
+            const nextJoinedPlayers = existingMatch.joined_players + 1;
+            const nextStatus =
+                nextJoinedPlayers >= existingMatch.required_players
+                    ? "已滿團"
+                    : "徵求中";
+
+            const { data: updatedMatch, error: updateMatchError } = await supabase
+                .from("matches")
+                .update({
+                    joined_players: nextJoinedPlayers,
+                    status: nextStatus,
+                })
+                .eq("id", matchId)
+                .eq("joined_players", existingMatch.joined_players)
+                .eq("status", "徵求中")
+                .select()
+                .maybeSingle();
+
+            if (updateMatchError) {
+                return NextResponse.json(
+                    {
+                        message: "加入球局失敗。",
+                        error: updateMatchError.message,
+                    },
+                    { status: 500 }
+                );
+            }
+
+            if (!updatedMatch) {
+                return NextResponse.json(
+                    { message: "名額已變動，請重新整理後再試。" },
+                    { status: 409 }
+                );
+            }
+
+            const participantPayload = {
+                role: "參與者",
+                status: "已加入",
+                updated_at: new Date().toISOString(),
+            };
+            const participantQuery = existingParticipant
+                ? supabase
+                      .from("match_participants")
+                      .update(participantPayload)
+                      .eq("id", existingParticipant.id)
+                      .select()
+                      .single()
+                : supabase
+                      .from("match_participants")
+                      .insert({
+                          match_id: matchId,
+                          user_id: userId,
+                          ...participantPayload,
+                      })
+                      .select()
+                      .single();
+
+            const { data: participant, error: participantError } =
+                await participantQuery;
+
+            if (participantError) {
+                await supabase
+                    .from("matches")
+                    .update({
+                        joined_players: existingMatch.joined_players,
+                        status: existingMatch.status,
+                    })
+                    .eq("id", matchId);
+
+                return NextResponse.json(
+                    {
+                        message: "加入球局失敗，無法寫入參與紀錄。",
+                        error: participantError.message,
+                    },
+                    { status: 500 }
+                );
+            }
+
+            return NextResponse.json(
+                {
+                    message: "已加入球局。",
+                    match: updatedMatch,
+                    participant,
+                },
+                { status: 200 }
             );
         }
 

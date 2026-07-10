@@ -144,6 +144,7 @@ export default function TennisHome() {
         <div className="content-grid">
           <MatchesSection
             currentUser={currentUser}
+            onRequireLogin={() => resetForm("login")}
             refreshKey={matchesRefreshKey}
             onMatchesChanged={() =>
               setMatchesRefreshKey((current) => current + 1)
