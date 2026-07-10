@@ -26,6 +26,7 @@ export function MatchesSection({
   const [actionStatus, setActionStatus] = useState("");
   const [cancellingMatchId, setCancellingMatchId] = useState<string | null>(null);
   const [joiningMatchId, setJoiningMatchId] = useState<string | null>(null);
+  const [leavingMatchId, setLeavingMatchId] = useState<string | null>(null);
   const [selectedMatchCity, setSelectedMatchCity] = useState("");
   const [selectedMatchDistrict, setSelectedMatchDistrict] = useState("");
 
@@ -49,6 +50,10 @@ export function MatchesSection({
 
     if (selectedMatchDistrict) {
       params.set("district", selectedMatchDistrict);
+    }
+
+    if (currentUser?.id) {
+      params.set("userId", currentUser.id);
     }
 
     async function loadMatches() {
@@ -82,7 +87,7 @@ export function MatchesSection({
     return () => {
       controller.abort();
     };
-  }, [selectedMatchCity, selectedMatchDistrict, refreshKey]);
+  }, [currentUser?.id, selectedMatchCity, selectedMatchDistrict, refreshKey]);
 
   function handleMatchCitySelect(city: string) {
     const nextCity = selectedMatchCity === city ? "" : city;
@@ -167,12 +172,55 @@ export function MatchesSection({
         return;
       }
 
+      if (data.message === "你已經加入此球局。") {
+        onMatchesChanged();
+        return;
+      }
+
       setActionStatus(data.message ?? "已加入球局。");
       onMatchesChanged();
     } catch {
       setActionStatus("網路連線異常，請稍後再試。");
     } finally {
       setJoiningMatchId(null);
+    }
+  }
+
+  async function handleLeaveMatch(matchId: string) {
+    if (!currentUser) {
+      onRequireLogin();
+      setActionStatus("請先登入後再退出球局。");
+      return;
+    }
+
+    setActionStatus("");
+    setLeavingMatchId(matchId);
+
+    try {
+      const response = await fetch("/api/matches", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "leave",
+          matchId,
+          userId: currentUser.id,
+        }),
+      });
+      const data = (await response.json()) as MatchResponse;
+
+      if (!response.ok) {
+        setActionStatus(data.message ?? data.error ?? "退出球局失敗。");
+        return;
+      }
+
+      setActionStatus(data.message ?? "已退出球局。");
+      onMatchesChanged();
+    } catch {
+      setActionStatus("網路連線異常，請稍後再試。");
+    } finally {
+      setLeavingMatchId(null);
     }
   }
 
@@ -240,10 +288,12 @@ export function MatchesSection({
             currentUser={currentUser}
             isCancelling={cancellingMatchId === match.id}
             isJoining={joiningMatchId === match.id}
+            isLeaving={leavingMatchId === match.id}
             key={match.id}
             match={match}
             onCancelMatch={handleCancelMatch}
             onJoinMatch={handleJoinMatch}
+            onLeaveMatch={handleLeaveMatch}
           />
         ))}
       </div>
@@ -255,18 +305,22 @@ type MatchCardProps = {
   currentUser: StoredUser | null;
   isCancelling: boolean;
   isJoining: boolean;
+  isLeaving: boolean;
   match: MatchSummary;
   onCancelMatch: (matchId: string) => void;
   onJoinMatch: (matchId: string) => void;
+  onLeaveMatch: (matchId: string) => void;
 };
 
 function MatchCard({
   currentUser,
   isCancelling,
   isJoining,
+  isLeaving,
   match,
   onCancelMatch,
   onJoinMatch,
+  onLeaveMatch,
 }: MatchCardProps) {
   const isHost = currentUser?.id === match.host.id;
   const isFull = match.status === "已滿團";
@@ -329,6 +383,15 @@ function MatchCard({
             type="button"
           >
             {isCancelling ? "取消中" : "取消"}
+          </button>
+        ) : match.hasJoined ? (
+          <button
+            className="cancel-match-button"
+            disabled={isLeaving}
+            onClick={() => onLeaveMatch(match.id)}
+            type="button"
+          >
+            {isLeaving ? "退出中" : "退出"}
           </button>
         ) : isFull ? (
           <button className="full-match-button" disabled type="button">

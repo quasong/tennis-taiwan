@@ -47,6 +47,10 @@ type UserRecord = {
     nickname: string | null;
 };
 
+type ParticipantRecord = {
+    match_id: string;
+};
+
 const cityAliases: Record<string, string[]> = {
     台北: ["台北", "台北市", "臺北", "臺北市"],
     臺北: ["台北", "台北市", "臺北", "臺北市"],
@@ -86,8 +90,16 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url);
         const city = searchParams.get("city")?.trim();
         const district = searchParams.get("district")?.trim();
+        const userId = searchParams.get("userId")?.trim();
         const supabase = createClient(supabaseUrl, supabaseKey);
         let scopedCourts: CourtRecord[] | null = null;
+
+        if (userId && !isValidUuid(userId)) {
+            return NextResponse.json(
+                { message: "userId 格式不正確。" },
+                { status: 400 }
+            );
+        }
 
         if (city) {
             let courtsQuery = supabase
@@ -148,6 +160,7 @@ export async function GET(request: NextRequest) {
         const courtIds = Array.from(
             new Set(matchRecords.map((match) => match.court_id))
         );
+        const matchIds = matchRecords.map((match) => match.id);
         const userIds = Array.from(
             new Set(matchRecords.map((match) => match.host_user_id))
         );
@@ -155,12 +168,21 @@ export async function GET(request: NextRequest) {
         const [
             { data: courtRows, error: courtRowsError },
             { data: userRows, error: userRowsError },
+            { data: participantRows, error: participantRowsError },
         ] = await Promise.all([
             supabase
                 .from("courts")
                 .select("id, name, city, district, address")
                 .in("id", courtIds),
             supabase.from("users").select("id, email, nickname").in("id", userIds),
+            userId
+                ? supabase
+                      .from("match_participants")
+                      .select("match_id")
+                      .eq("user_id", userId)
+                      .eq("status", "已加入")
+                      .in("match_id", matchIds)
+                : Promise.resolve({ data: [], error: null }),
         ]);
 
         if (courtRowsError) {
@@ -177,11 +199,26 @@ export async function GET(request: NextRequest) {
             );
         }
 
+        if (participantRowsError) {
+            return NextResponse.json(
+                {
+                    message: "讀取參與狀態失敗。",
+                    error: participantRowsError.message,
+                },
+                { status: 500 }
+            );
+        }
+
         const courtsById = new Map(
             ((courtRows ?? []) as CourtRecord[]).map((court) => [court.id, court])
         );
         const usersById = new Map(
             ((userRows ?? []) as UserRecord[]).map((user) => [user.id, user])
+        );
+        const joinedMatchIds = new Set(
+            ((participantRows ?? []) as ParticipantRecord[]).map(
+                (participant) => participant.match_id
+            )
         );
 
         return NextResponse.json(
@@ -198,6 +235,7 @@ export async function GET(request: NextRequest) {
                         feePerPerson: Number(match.estimated_fee_per_person),
                         note: match.note,
                         status: match.status,
+                        hasJoined: joinedMatchIds.has(match.id),
                         court: court
                             ? {
                                   id: court.id,
@@ -391,7 +429,7 @@ export async function PATCH(request: NextRequest) {
         const body = (await request.json()) as MatchActionBody;
         const { action, matchId, userId } = body;
 
-        if (action !== "cancel" && action !== "join") {
+        if (action !== "cancel" && action !== "join" && action !== "leave") {
             return NextResponse.json(
                 { message: "不支援的球局操作。" },
                 { status: 400 }
@@ -429,6 +467,119 @@ export async function PATCH(request: NextRequest) {
             return NextResponse.json(
                 { message: "找不到指定的球局。" },
                 { status: 404 }
+            );
+        }
+
+        if (action === "leave") {
+            if (existingMatch.host_user_id === userId) {
+                return NextResponse.json(
+                    { message: "創建者請使用取消球局。" },
+                    { status: 403 }
+                );
+            }
+
+            if (
+                existingMatch.status !== "徵求中" &&
+                existingMatch.status !== "已滿團"
+            ) {
+                return NextResponse.json(
+                    { message: "此球局目前無法退出。" },
+                    { status: 409 }
+                );
+            }
+
+            const { data: existingParticipant, error: participantLookupError } =
+                await supabase
+                    .from("match_participants")
+                    .select("id")
+                    .eq("match_id", matchId)
+                    .eq("user_id", userId)
+                    .eq("status", "已加入")
+                    .maybeSingle();
+
+            if (participantLookupError) {
+                return NextResponse.json(
+                    {
+                        message: "檢查參與紀錄時發生錯誤。",
+                        error: participantLookupError.message,
+                    },
+                    { status: 500 }
+                );
+            }
+
+            if (!existingParticipant) {
+                return NextResponse.json(
+                    { message: "你尚未加入此球局。" },
+                    { status: 200 }
+                );
+            }
+
+            const nextJoinedPlayers = Math.max(
+                1,
+                existingMatch.joined_players - 1
+            );
+            const nextStatus =
+                nextJoinedPlayers >= existingMatch.required_players
+                    ? "已滿團"
+                    : "徵求中";
+
+            const { data: updatedMatch, error: updateMatchError } = await supabase
+                .from("matches")
+                .update({
+                    joined_players: nextJoinedPlayers,
+                    status: nextStatus,
+                })
+                .eq("id", matchId)
+                .eq("joined_players", existingMatch.joined_players)
+                .select()
+                .maybeSingle();
+
+            if (updateMatchError) {
+                return NextResponse.json(
+                    {
+                        message: "退出球局失敗。",
+                        error: updateMatchError.message,
+                    },
+                    { status: 500 }
+                );
+            }
+
+            if (!updatedMatch) {
+                return NextResponse.json(
+                    { message: "人數已變動，請重新整理後再試。" },
+                    { status: 409 }
+                );
+            }
+
+            const { error: deleteParticipantError } = await supabase
+                .from("match_participants")
+                .delete()
+                .eq("id", existingParticipant.id);
+
+            if (deleteParticipantError) {
+                await supabase
+                    .from("matches")
+                    .update({
+                        joined_players: existingMatch.joined_players,
+                        status: existingMatch.status,
+                    })
+                    .eq("id", matchId);
+
+                return NextResponse.json(
+                    {
+                        message: "退出球局失敗，無法刪除參與紀錄。",
+                        error: deleteParticipantError.message,
+                    },
+                    { status: 500 }
+                );
+            }
+
+            return NextResponse.json(
+                {
+                    message: "已退出球局。",
+                    match: updatedMatch,
+                },
+                { status: 200 }
             );
         }
 

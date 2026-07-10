@@ -48,6 +48,7 @@ export type MatchSummary = {
   feePerPerson: number;
   note: string | null;
   status: string;
+  hasJoined: boolean;
   court: {
     id: string;
     name: string;
