@@ -43,6 +43,8 @@ export type MatchResponse = {
 export type MatchSummary = {
   id: string;
   playTime: string;
+  requiredPlayers: number;
+  joinedPlayers: number;
   feePerPerson: number;
   status: string;
   court: {

@@ -144,6 +144,9 @@ export function MatchesSection({ refreshKey }: MatchesSectionProps) {
               <p>創建者：{match.host.nickname}</p>
             </div>
             <div className="match-meta">
+              <span className="player-count">
+                {match.joinedPlayers} / {match.requiredPlayers} 人
+              </span>
               <span>{formatFee(match.feePerPerson)} / 人</span>
             </div>
             <button className="join-button" type="button">
