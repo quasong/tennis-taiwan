@@ -625,10 +625,10 @@ button {
 .match-action-area {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  align-items: flex-end;
   justify-content: center;
   gap: 12px;
-  min-width: 220px;
+  min-width: 184px;
 }
 
 .match-meta {
@@ -659,10 +659,11 @@ button {
   border-radius: 999px;
   background: var(--accent);
   color: var(--navy);
-  width: 100%;
-  min-width: 150px;
-  min-height: 42px;
-  padding: 0 24px;
+  width: auto;
+  min-width: 126px;
+  min-height: 36px;
+  padding: 0 20px;
+  font-size: 0.92rem;
   font-weight: 800;
 }
 
@@ -675,10 +676,11 @@ button {
   border-radius: 999px;
   background: #e9efec;
   color: var(--muted);
-  width: 100%;
-  min-width: 150px;
-  min-height: 42px;
-  padding: 0 24px;
+  width: auto;
+  min-width: 126px;
+  min-height: 36px;
+  padding: 0 20px;
+  font-size: 0.92rem;
   font-weight: 800;
 }
 
@@ -694,12 +696,13 @@ button {
   border-radius: 999px;
   background: #d83a2f;
   color: #fff;
-  width: 100%;
-  min-width: 150px;
-  min-height: 42px;
-  padding: 0 24px;
+  width: auto;
+  min-width: 126px;
+  min-height: 36px;
+  padding: 0 20px;
+  font-size: 0.92rem;
   font-weight: 800;
-  box-shadow: 0 12px 24px rgba(216, 58, 47, 0.22);
+  box-shadow: 0 10px 20px rgba(216, 58, 47, 0.18);
 }
 
 .cancel-match-button:disabled {
@@ -1256,6 +1259,15 @@ textarea:disabled {
     min-width: 0;
   }
 
+  .join-button,
+  .full-match-button,
+  .cancel-match-button {
+    min-width: 118px;
+    min-height: 34px;
+    padding: 0 18px;
+    font-size: 0.88rem;
+  }
+
   .toolbar {
     flex-direction: column;
   }
@@ -1300,8 +1312,106 @@ textarea:disabled {
     grid-template-columns: 1fr;
   }
 
+  .match-action-area {
+    gap: 10px;
+  }
+
+  .join-button,
+  .full-match-button,
+  .cancel-match-button {
+    min-width: 104px;
+    min-height: 32px;
+    padding: 0 16px;
+    font-size: 0.84rem;
+  }
+
+  .match-participants-panel {
+    padding-top: 12px;
+  }
+
+  .match-participant-shell {
+    position: relative;
+    display: block;
+  }
+
+  .match-participant-toggle {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 1;
+    width: 42px;
+    min-width: 42px;
+    height: 28px;
+    min-height: 28px;
+    margin-top: 0;
+  }
+
+  .match-participant-table {
+    border-radius: 8px;
+    background: rgba(238, 245, 239, 0.72);
+    padding: 8px 58px 8px 8px;
+  }
+
   .match-participant-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) 46px;
+    grid-template-rows: auto auto;
+    gap: 2px 8px;
+    min-height: 48px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.72);
+    padding: 7px 8px;
+  }
+
+  .match-participant-row + .match-participant-row {
+    margin-top: 6px;
+  }
+
+  .match-participant-row .match-host-link,
+  .match-participant-row .match-email-link,
+  .match-participant-row .match-participant-muted {
+    width: 100%;
+    min-height: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+    font-size: 0.78rem;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .match-participant-row .match-host-link:hover,
+  .match-participant-row .match-email-link:hover {
+    background: transparent;
+    color: var(--navy);
+  }
+
+  .match-participant-row .match-host-link {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .match-participant-row .match-email-link,
+  .match-participant-row .match-participant-muted {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .match-participant-ntrp {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    align-self: center;
+    width: 46px;
+    min-height: 26px;
+  }
+
+  .match-host-link-creator {
+    padding-right: 10px;
+  }
+
+  .match-host-link-creator::after {
+    display: none;
   }
 
   .match-participant-table-head {
@@ -1309,11 +1419,11 @@ textarea:disabled {
   }
 
   .match-participant-table-body {
-    max-height: 120px;
+    max-height: 48px;
   }
 
   .match-participants-panel.expanded .match-participant-table-body {
-    max-height: 560px;
+    max-height: 360px;
   }
 }
 
