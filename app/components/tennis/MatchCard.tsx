@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useMemo, useState } from "react";
 import { formatFee, formatMatchTime } from "./format";
 import type { MatchParticipant, MatchSummary, StoredUser } from "./types";
 
@@ -101,10 +104,7 @@ export function getMatchCardAction({
 }
 
 export function MatchCard({ action, currentUser, match }: MatchCardProps) {
-  const isHost = currentUser?.id === match.host.id;
   const courtAddress = match.court?.address?.trim();
-  const hostEmail = match.host.email.trim();
-  const hostProfileHref = isHost ? "/profile" : `/profile/${match.host.id}`;
   const mapsUrl = courtAddress
     ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
         courtAddress
@@ -131,34 +131,14 @@ export function MatchCard({ action, currentUser, match }: MatchCardProps) {
           </div>
         </div>
 
-        <dl className="match-details" aria-label="球局資訊">
-          <div className="match-detail-row">
-            <dt>創建者</dt>
-            <dd>
-              <Link className="match-host-link" href={hostProfileHref}>
-                {match.host.nickname}
-              </Link>
-            </dd>
-          </div>
-          <div className="match-detail-row">
-            <dt>信箱</dt>
-            <dd>
-              {hostEmail ? (
-                <a className="match-email-link" href={`mailto:${hostEmail}`}>
-                  {hostEmail}
-                </a>
-              ) : (
-                "未提供"
-              )}
-            </dd>
-          </div>
-          {match.note ? (
+        {match.note ? (
+          <dl className="match-details" aria-label="球局資訊">
             <div className="match-detail-row match-note-row">
               <dt>備註</dt>
               <dd>{match.note}</dd>
             </div>
-          ) : null}
-        </dl>
+          </dl>
+        ) : null}
       </div>
 
       <div className="match-action-area">
@@ -191,28 +171,53 @@ type ParticipantListProps = {
 };
 
 function ParticipantList({ currentUser, match }: ParticipantListProps) {
-  const participants = match.participants ?? [];
+  const [isExpanded, setIsExpanded] = useState(false);
+  const participants = match.participants;
+  const displayParticipants = useMemo(
+    () => getDisplayParticipants(match, participants),
+    [match, participants]
+  );
+  const canExpand = displayParticipants.length > 1;
 
   return (
-    <details className="match-participants-panel">
-      <summary>
-        <span>參與者名單</span>
-        <span>{participants.length} 人</span>
-      </summary>
-      {participants.length > 0 ? (
-        <div className="match-participant-list">
-          {participants.map((participant) => (
-            <ParticipantRow
-              currentUser={currentUser}
-              key={`${match.id}-${participant.id}`}
-              participant={participant}
-            />
-          ))}
+    <section
+      className={`match-participants-panel ${isExpanded ? "expanded" : ""}`}
+      aria-label="參與者名單"
+    >
+      {displayParticipants.length > 0 ? (
+        <div className="match-participant-shell">
+          <div className="match-participant-table">
+            <div className="match-participant-table-head" aria-hidden="true">
+              <span>玩家</span>
+              <span>信箱</span>
+              <span>NTRP</span>
+            </div>
+            <div className="match-participant-table-body">
+              {displayParticipants.map((participant) => (
+                <ParticipantRow
+                  currentUser={currentUser}
+                  key={`${match.id}-${participant.id}`}
+                  participant={participant}
+                />
+              ))}
+            </div>
+          </div>
+          {canExpand ? (
+            <button
+              aria-expanded={isExpanded}
+              aria-label={isExpanded ? "收合參與者名單" : "展開全部參與者"}
+              className="match-participant-toggle"
+              onClick={() => setIsExpanded((current) => !current)}
+              type="button"
+            >
+              <span aria-hidden="true">⌄</span>
+            </button>
+          ) : null}
         </div>
       ) : (
         <p className="match-participant-empty">目前沒有參與者資料。</p>
       )}
-    </details>
+    </section>
   );
 }
 
@@ -225,11 +230,17 @@ function ParticipantRow({ currentUser, participant }: ParticipantRowProps) {
   const profileHref =
     currentUser?.id === participant.id ? "/profile" : `/profile/${participant.id}`;
   const ntrpLabel =
-    participant.ntrpLevel === null ? "NTRP 未提供" : `NTRP ${participant.ntrpLevel}`;
+    participant.ntrpLevel === null ? "未提供" : String(participant.ntrpLevel);
+  const isCreator = participant.role === "創建者";
 
   return (
     <div className="match-participant-row">
-      <Link className="match-host-link" href={profileHref}>
+      <Link
+        aria-label={isCreator ? `${participant.nickname}，創建者` : participant.nickname}
+        className={`match-host-link${isCreator ? " match-host-link-creator" : ""}`}
+        href={profileHref}
+        title={isCreator ? "創建者" : undefined}
+      >
         {participant.nickname}
       </Link>
       {participant.email ? (
@@ -240,9 +251,26 @@ function ParticipantRow({ currentUser, participant }: ParticipantRowProps) {
         <span className="match-participant-muted">未提供信箱</span>
       )}
       <span className="match-participant-ntrp">{ntrpLabel}</span>
-      {participant.role ? (
-        <span className="match-participant-role">{participant.role}</span>
-      ) : null}
     </div>
   );
+}
+
+function getDisplayParticipants(
+  match: MatchSummary,
+  participants: MatchParticipant[]
+): MatchParticipant[] {
+  const hostParticipant =
+    participants.find((participant) => participant.id === match.host.id) ?? {
+      id: match.host.id,
+      email: match.host.email,
+      nickname: match.host.nickname,
+      ntrpLevel: null,
+      role: "創建者",
+      status: "已加入",
+    };
+  const otherParticipants = participants.filter(
+    (participant) => participant.id !== match.host.id
+  );
+
+  return [hostParticipant, ...otherParticipants];
 }
