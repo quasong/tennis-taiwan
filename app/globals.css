@@ -573,7 +573,8 @@ button {
 }
 
 .match-address-link,
-.match-email-link {
+.match-email-link,
+.match-host-link {
   display: inline-flex;
   align-items: center;
   min-width: 0;
@@ -592,12 +593,14 @@ button {
   max-width: min(42vw, 420px);
 }
 
+.match-host-link,
 .match-email-link {
   max-width: 100%;
 }
 
 .match-address-link:hover,
-.match-email-link:hover {
+.match-email-link:hover,
+.match-host-link:hover {
   background: #fff7d6;
   color: var(--navy);
 }
@@ -619,18 +622,17 @@ button {
 .match-action-area {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
+  align-items: stretch;
+  justify-content: center;
   gap: 14px;
-  min-width: max-content;
+  min-width: 240px;
 }
 
 .match-meta {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
-  max-width: 260px;
-  gap: 10px;
+  justify-content: flex-start;
+  gap: 8px;
 }
 
 .match-meta span {
@@ -646,11 +648,17 @@ button {
   background: #fff7d6;
 }
 
+.match-meta .match-status-pill {
+  background: #eef5ef;
+}
+
 .join-button {
   border-radius: 999px;
   background: var(--accent);
   color: var(--navy);
-  padding: 0 22px;
+  width: 100%;
+  min-width: 150px;
+  padding: 0 28px;
   font-weight: 800;
 }
 
@@ -663,7 +671,9 @@ button {
   border-radius: 999px;
   background: #e9efec;
   color: var(--muted);
-  padding: 0 22px;
+  width: 100%;
+  min-width: 150px;
+  padding: 0 28px;
   font-weight: 800;
 }
 
@@ -679,7 +689,9 @@ button {
   border-radius: 999px;
   background: #d83a2f;
   color: #fff;
-  padding: 0 22px;
+  width: 100%;
+  min-width: 150px;
+  padding: 0 28px;
   font-weight: 800;
   box-shadow: 0 12px 24px rgba(216, 58, 47, 0.22);
 }

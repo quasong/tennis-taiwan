@@ -15,11 +15,14 @@ import type {
   MatchResponse,
   MatchSummary,
   ProfileResponse,
-  StoredUser,
 } from "./tennis/types";
 
 type ProfileTab = "created" | "joined";
 type ProfileMatchAction = "cancel" | "leave";
+
+type ProfilePageProps = {
+  viewedUserId?: string;
+};
 
 function formatJoinDate(value: string | null | undefined) {
   if (!value) return "未提供";
@@ -31,11 +34,11 @@ function formatJoinDate(value: string | null | undefined) {
   }).format(new Date(value));
 }
 
-function getUserInitial(user: StoredUser | null) {
-  return (user?.name || user?.email || "T").slice(0, 1).toUpperCase();
+function getUserInitial(name: string | null | undefined) {
+  return (name || "T").slice(0, 1).toUpperCase();
 }
 
-export default function ProfilePage() {
+export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [status, setStatus] = useState("正在載入個人資料...");
   const [actionStatus, setActionStatus] = useState("");
@@ -52,13 +55,15 @@ export default function ProfilePage() {
     () => parseStoredUser(authSnapshot),
     [authSnapshot]
   );
+  const targetUserId = viewedUserId ?? currentUser?.id;
+  const isOwnProfile = Boolean(currentUser && targetUserId === currentUser.id);
 
   useEffect(() => {
-    if (!currentUser) {
+    if (!targetUserId) {
       return;
     }
 
-    const userId = currentUser.id;
+    const userId = targetUserId;
     const controller = new AbortController();
 
     async function loadProfile() {
@@ -91,7 +96,7 @@ export default function ProfilePage() {
     return () => {
       controller.abort();
     };
-  }, [currentUser, profileRefreshKey]);
+  }, [targetUserId, profileRefreshKey]);
 
   async function handleLogout() {
     try {
@@ -147,7 +152,9 @@ export default function ProfilePage() {
   const createdMatches = profile?.createdMatches ?? [];
   const joinedMatches = profile?.joinedMatches ?? [];
   const visibleMatches = activeTab === "created" ? createdMatches : joinedMatches;
-  const visibleStatus = currentUser ? status : "請先登入後查看個人主頁。";
+  const visibleStatus = targetUserId ? status : "請先登入後查看個人主頁。";
+  const profileName = profile?.user?.nickname ?? currentUser?.name ?? "個人主頁";
+  const profileEmail = profile?.user?.email ?? currentUser?.email ?? "";
 
   return (
     <main className="app-shell profile-shell">
@@ -165,12 +172,12 @@ export default function ProfilePage() {
       <section className="profile-hero" aria-labelledby="profile-title">
         <div className="profile-identity">
           <span className="profile-avatar" aria-hidden="true">
-            {getUserInitial(currentUser)}
+            {getUserInitial(profileName || profileEmail)}
           </span>
           <div>
             <p className="eyebrow">Profile</p>
-            <h1 id="profile-title">{currentUser?.name ?? "個人主頁"}</h1>
-            <p>{currentUser?.email ?? "登入後查看完整個人資訊"}</p>
+            <h1 id="profile-title">{profileName}</h1>
+            <p>{profileEmail || "登入後查看完整個人資訊"}</p>
           </div>
         </div>
         <Link className="ghost-button" href="/">
@@ -190,7 +197,7 @@ export default function ProfilePage() {
         </div>
       ) : null}
 
-      {currentUser && profile ? (
+      {targetUserId && profile ? (
         <section className="profile-grid" aria-label="個人資料與球局">
           <aside className="profile-panel">
             <p className="eyebrow">Account</p>
@@ -198,20 +205,24 @@ export default function ProfilePage() {
             <dl className="profile-info-list">
               <div>
                 <dt>暱稱</dt>
-                <dd>{profile.user?.nickname ?? currentUser.name}</dd>
+                <dd>{profile.user?.nickname ?? "未提供"}</dd>
               </div>
               <div>
                 <dt>Email</dt>
                 <dd>
-                  <a href={`mailto:${profile.user?.email ?? currentUser.email}`}>
-                    {profile.user?.email ?? currentUser.email}
-                  </a>
+                  {profile.user?.email ? (
+                    <a href={`mailto:${profile.user.email}`}>
+                      {profile.user.email}
+                    </a>
+                  ) : (
+                    "未提供"
+                  )}
                 </dd>
               </div>
               <div>
                 <dt>NTRP</dt>
                 <dd>
-                  {profile.user?.ntrp_level ?? currentUser.ntrpLevel ?? "未提供"}
+                  {profile.user?.ntrp_level ?? currentUser?.ntrpLevel ?? "未提供"}
                 </dd>
               </div>
               <div>
@@ -261,6 +272,7 @@ export default function ProfilePage() {
                   <ProfileMatchCard
                     action={activeTab === "created" ? "cancel" : "leave"}
                     isActing={actingMatchId === match.id}
+                    isOwnProfile={isOwnProfile}
                     key={match.id}
                     match={match}
                     onAction={handleMatchAction}
@@ -284,6 +296,7 @@ export default function ProfilePage() {
 type ProfileMatchCardProps = {
   action: ProfileMatchAction;
   isActing: boolean;
+  isOwnProfile: boolean;
   match: MatchSummary;
   onAction: (matchId: string, action: ProfileMatchAction) => void;
 };
@@ -291,6 +304,7 @@ type ProfileMatchCardProps = {
 function ProfileMatchCard({
   action,
   isActing,
+  isOwnProfile,
   match,
   onAction,
 }: ProfileMatchCardProps) {
@@ -342,14 +356,16 @@ function ProfileMatchCard({
           </span>
           <span>{formatFee(match.feePerPerson)} / 人</span>
         </div>
-        <button
-          className={isEnded ? "full-match-button" : "cancel-match-button"}
-          disabled={isActing || isEnded}
-          onClick={() => onAction(match.id, action)}
-          type="button"
-        >
-          {isEnded ? "已結束" : isActing ? pendingLabel : actionLabel}
-        </button>
+        {isOwnProfile ? (
+          <button
+            className={isEnded ? "full-match-button" : "cancel-match-button"}
+            disabled={isActing || isEnded}
+            onClick={() => onAction(match.id, action)}
+            type="button"
+          >
+            {isEnded ? "已結束" : isActing ? pendingLabel : actionLabel}
+          </button>
+        ) : null}
       </div>
     </article>
   );

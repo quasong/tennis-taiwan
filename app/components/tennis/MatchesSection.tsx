@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatFee, formatMatchTime } from "./format";
 import { municipalities } from "./locations";
@@ -383,6 +384,7 @@ function MatchCard({
   const isFull = match.status === "已滿團";
   const courtAddress = match.court?.address?.trim();
   const hostEmail = match.host.email.trim();
+  const hostProfileHref = isHost ? "/profile" : `/profile/${match.host.id}`;
   const mapsUrl = courtAddress
     ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
         courtAddress
@@ -412,7 +414,11 @@ function MatchCard({
         <dl className="match-details" aria-label="球局資訊">
           <div className="match-detail-row">
             <dt>創建者</dt>
-            <dd>{match.host.nickname}</dd>
+            <dd>
+              <Link className="match-host-link" href={hostProfileHref}>
+                {match.host.nickname}
+              </Link>
+            </dd>
           </div>
           <div className="match-detail-row">
             <dt>信箱</dt>
@@ -436,6 +442,7 @@ function MatchCard({
       </div>
       <div className="match-action-area">
         <div className="match-meta">
+          <span className="match-status-pill">{match.status}</span>
           <span className="player-count">
             {match.joinedPlayers} / {match.requiredPlayers} 人
           </span>
