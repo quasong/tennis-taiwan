@@ -68,3 +68,20 @@ export type MatchesResponse = {
   message?: string;
   error?: string;
 };
+
+export type ProfileUser = {
+  id: string;
+  email: string | null;
+  nickname: string | null;
+  ntrp_level: number | null;
+  preferred_court_id: string | null;
+  created_at: string | null;
+};
+
+export type ProfileResponse = {
+  user?: ProfileUser;
+  createdMatches?: MatchSummary[];
+  joinedMatches?: MatchSummary[];
+  message?: string;
+  error?: string;
+};

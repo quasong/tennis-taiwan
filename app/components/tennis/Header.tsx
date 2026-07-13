@@ -31,12 +31,12 @@ export function Header({
       <nav className="auth-actions" aria-label="會員功能">
         {currentUser ? (
           <>
-            <span className="user-pill">
+            <Link className="user-pill" href="/profile" aria-label="前往個人主頁">
               <span className="avatar" aria-hidden="true">
                 {userInitial}
               </span>
               <span>{currentUser.name}</span>
-            </span>
+            </Link>
             <button className="ghost-button" type="button" onClick={onLogout}>
               登出
             </button>
