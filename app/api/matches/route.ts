@@ -429,7 +429,12 @@ export async function PATCH(request: NextRequest) {
         const body = (await request.json()) as MatchActionBody;
         const { action, matchId, userId } = body;
 
-        if (action !== "cancel" && action !== "join" && action !== "leave") {
+        if (
+            action !== "cancel" &&
+            action !== "delete" &&
+            action !== "join" &&
+            action !== "leave"
+        ) {
             return NextResponse.json(
                 { message: "不支援的球局操作。" },
                 { status: 400 }
@@ -467,6 +472,71 @@ export async function PATCH(request: NextRequest) {
             return NextResponse.json(
                 { message: "找不到指定的球局。" },
                 { status: 404 }
+            );
+        }
+
+        if (action === "delete") {
+            if (existingMatch.host_user_id !== userId) {
+                return NextResponse.json(
+                    { message: "只有球局創建者可以刪除此球局。" },
+                    { status: 403 }
+                );
+            }
+
+            if (existingMatch.status !== "已結束") {
+                return NextResponse.json(
+                    { message: "只有已結束的球局可以刪除。" },
+                    { status: 409 }
+                );
+            }
+
+            const { error: deleteParticipantsError } = await supabase
+                .from("match_participants")
+                .delete()
+                .eq("match_id", matchId);
+
+            if (deleteParticipantsError) {
+                return NextResponse.json(
+                    {
+                        message: "刪除球局失敗，無法刪除參與紀錄。",
+                        error: deleteParticipantsError.message,
+                    },
+                    { status: 500 }
+                );
+            }
+
+            const { data: deletedMatch, error: deleteMatchError } = await supabase
+                .from("matches")
+                .delete()
+                .eq("id", matchId)
+                .eq("host_user_id", userId)
+                .eq("status", "已結束")
+                .select("id")
+                .maybeSingle();
+
+            if (deleteMatchError) {
+                return NextResponse.json(
+                    {
+                        message: "刪除球局失敗。",
+                        error: deleteMatchError.message,
+                    },
+                    { status: 500 }
+                );
+            }
+
+            if (!deletedMatch) {
+                return NextResponse.json(
+                    { message: "球局狀態已變動，請重新整理後再試。" },
+                    { status: 409 }
+                );
+            }
+
+            return NextResponse.json(
+                {
+                    message: "球局已刪除。",
+                    match: deletedMatch,
+                },
+                { status: 200 }
             );
         }
 

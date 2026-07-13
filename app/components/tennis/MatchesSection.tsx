@@ -37,6 +37,7 @@ export function MatchesSection({
   const [matchesStatus, setMatchesStatus] = useState("正在載入球局...");
   const [actionStatus, setActionStatus] = useState("");
   const [cancellingMatchId, setCancellingMatchId] = useState<string | null>(null);
+  const [deletingMatchId, setDeletingMatchId] = useState<string | null>(null);
   const [joiningMatchId, setJoiningMatchId] = useState<string | null>(null);
   const [leavingMatchId, setLeavingMatchId] = useState<string | null>(null);
   const [selectedMatchCity, setSelectedMatchCity] = useState("");
@@ -201,6 +202,44 @@ export function MatchesSection({
     }
   }
 
+  async function handleDeleteMatch(matchId: string) {
+    if (!currentUser) {
+      setActionStatus("請先登入後再刪除球局。");
+      return;
+    }
+
+    setActionStatus("");
+    setDeletingMatchId(matchId);
+
+    try {
+      const response = await fetch("/api/matches", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "delete",
+          matchId,
+          userId: currentUser.id,
+        }),
+      });
+      const data = (await response.json()) as MatchResponse;
+
+      if (!response.ok) {
+        setActionStatus(data.message ?? data.error ?? "刪除球局失敗。");
+        return;
+      }
+
+      setActionStatus(data.message ?? "球局已刪除。");
+      matchesCacheRef.current.clear();
+      onMatchesChanged();
+    } catch {
+      setActionStatus("網路連線異常，請稍後再試。");
+    } finally {
+      setDeletingMatchId(null);
+    }
+  }
+
   async function handleJoinMatch(matchId: string) {
     if (!currentUser) {
       onRequireLogin();
@@ -291,6 +330,11 @@ export function MatchesSection({
       return;
     }
 
+    if (action === "delete") {
+      handleDeleteMatch(matchId);
+      return;
+    }
+
     if (action === "leave") {
       handleLeaveMatch(matchId);
       return;
@@ -362,6 +406,7 @@ export function MatchesSection({
           <OpenMatchCard
             currentUser={currentUser}
             isCancelling={cancellingMatchId === match.id}
+            isDeleting={deletingMatchId === match.id}
             isJoining={joiningMatchId === match.id}
             isLeaving={leavingMatchId === match.id}
             key={match.id}
@@ -377,6 +422,7 @@ export function MatchesSection({
 type OpenMatchCardProps = {
   currentUser: StoredUser | null;
   isCancelling: boolean;
+  isDeleting: boolean;
   isJoining: boolean;
   isLeaving: boolean;
   match: MatchSummary;
@@ -386,13 +432,22 @@ type OpenMatchCardProps = {
 function OpenMatchCard({
   currentUser,
   isCancelling,
+  isDeleting,
   isJoining,
   isLeaving,
   match,
   onAction,
 }: OpenMatchCardProps) {
   const pendingAction =
-    isCancelling ? "cancel" : isJoining ? "join" : isLeaving ? "leave" : null;
+    isCancelling
+      ? "cancel"
+      : isDeleting
+      ? "delete"
+      : isJoining
+      ? "join"
+      : isLeaving
+      ? "leave"
+      : null;
 
   return (
     <MatchCard

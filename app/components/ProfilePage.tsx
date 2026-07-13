@@ -150,6 +150,8 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
       const fallbackMessage =
         action === "cancel"
           ? "球局已取消。"
+          : action === "delete"
+          ? "球局已刪除。"
           : action === "join"
           ? "已加入球局。"
           : "已退出球局。";

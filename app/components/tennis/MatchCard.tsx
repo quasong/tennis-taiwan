@@ -2,7 +2,7 @@ import Link from "next/link";
 import { formatFee, formatMatchTime } from "./format";
 import type { MatchSummary, StoredUser } from "./types";
 
-export type MatchCardActionType = "cancel" | "join" | "leave";
+export type MatchCardActionType = "cancel" | "delete" | "join" | "leave";
 
 export type MatchCardActionConfig = {
   className: string;
@@ -36,6 +36,17 @@ export function getMatchCardAction({
   const isHost = currentUser?.id === match.host.id;
   const isEnded = match.status === "已結束";
   const isFull = match.status === "已滿團";
+
+  if (isHost && isEnded) {
+    return {
+      className: "cancel-match-button",
+      isPending: pendingAction === "delete",
+      label: "刪除",
+      onClick: () => onAction(match.id, "delete"),
+      pendingLabel: "刪除中",
+      type: "delete",
+    };
+  }
 
   if (isEnded) {
     return {
