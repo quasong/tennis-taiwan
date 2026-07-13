@@ -51,7 +51,7 @@ function toMatchSummary(
     match: MatchRecord,
     court: CourtRecord | undefined,
     host: UserRecord | undefined,
-    joinedMatchIds: Set<string>
+    viewerJoinedMatchIds: Set<string>
 ) {
     return {
         id: match.id,
@@ -61,7 +61,7 @@ function toMatchSummary(
         feePerPerson: Number(match.estimated_fee_per_person),
         note: match.note,
         status: match.status,
-        hasJoined: joinedMatchIds.has(match.id),
+        hasJoined: viewerJoinedMatchIds.has(match.id),
         court: court
             ? {
                   id: court.id,
@@ -90,7 +90,9 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        const userId = new URL(request.url).searchParams.get("userId")?.trim();
+        const searchParams = new URL(request.url).searchParams;
+        const userId = searchParams.get("userId")?.trim();
+        const viewerUserId = searchParams.get("viewerUserId")?.trim();
 
         if (!userId) {
             return NextResponse.json(
@@ -102,6 +104,13 @@ export async function GET(request: NextRequest) {
         if (!isValidUuid(userId)) {
             return NextResponse.json(
                 { message: "userId 格式不正確。" },
+                { status: 400 }
+            );
+        }
+
+        if (viewerUserId && !isValidUuid(viewerUserId)) {
+            return NextResponse.json(
+                { message: "viewerUserId 格式不正確。" },
                 { status: 400 }
             );
         }
@@ -162,18 +171,18 @@ export async function GET(request: NextRequest) {
         const participantRecords = ((participantRows ?? []) as ParticipantRecord[])
             .filter((participant) => participant.role !== "創建者")
             .filter((participant) => participant.status !== "已取消");
-        const joinedMatchIds = new Set(
+        const profileJoinedMatchIds = new Set(
             participantRecords.map((participant) => participant.match_id)
         );
 
         const { data: joinedRows, error: joinedError } =
-            joinedMatchIds.size > 0
+            profileJoinedMatchIds.size > 0
                 ? await supabase
                       .from("matches")
                       .select(
                           "id, host_user_id, court_id, play_time, required_players, joined_players, estimated_fee_per_person, note, status, created_at"
                       )
-                      .in("id", Array.from(joinedMatchIds))
+                      .in("id", Array.from(profileJoinedMatchIds))
                       .order("play_time", { ascending: true })
                 : { data: [], error: null };
 
@@ -188,12 +197,14 @@ export async function GET(request: NextRequest) {
             (match) => match.host_user_id !== userId
         );
         const allMatches = [...createdMatches, ...joinedMatches];
+        const matchIds = Array.from(new Set(allMatches.map((match) => match.id)));
         const courtIds = Array.from(new Set(allMatches.map((match) => match.court_id)));
         const hostIds = Array.from(new Set(allMatches.map((match) => match.host_user_id)));
 
         const [
             { data: courtRows, error: courtError },
             { data: hostRows, error: hostError },
+            { data: viewerParticipantRows, error: viewerParticipantError },
         ] = await Promise.all([
             courtIds.length > 0
                 ? supabase
@@ -208,6 +219,14 @@ export async function GET(request: NextRequest) {
                           "id, email, nickname, ntrp_level, preferred_court_id, created_at"
                       )
                       .in("id", hostIds)
+                : Promise.resolve({ data: [], error: null }),
+            viewerUserId && matchIds.length > 0
+                ? supabase
+                      .from("match_participants")
+                      .select("match_id, role, status")
+                      .eq("user_id", viewerUserId)
+                      .eq("status", "已加入")
+                      .in("match_id", matchIds)
                 : Promise.resolve({ data: [], error: null }),
         ]);
 
@@ -225,11 +244,26 @@ export async function GET(request: NextRequest) {
             );
         }
 
+        if (viewerParticipantError) {
+            return NextResponse.json(
+                {
+                    message: "讀取目前使用者參與狀態失敗。",
+                    error: viewerParticipantError.message,
+                },
+                { status: 500 }
+            );
+        }
+
         const courtsById = new Map(
             ((courtRows ?? []) as CourtRecord[]).map((court) => [court.id, court])
         );
         const hostsById = new Map(
             ((hostRows ?? []) as UserRecord[]).map((host) => [host.id, host])
+        );
+        const viewerJoinedMatchIds = new Set(
+            ((viewerParticipantRows ?? []) as ParticipantRecord[]).map(
+                (participant) => participant.match_id
+            )
         );
 
         return NextResponse.json(
@@ -240,7 +274,7 @@ export async function GET(request: NextRequest) {
                         match,
                         courtsById.get(match.court_id),
                         hostsById.get(match.host_user_id),
-                        joinedMatchIds
+                        viewerJoinedMatchIds
                     )
                 ),
                 joinedMatches: joinedMatches.map((match) =>
@@ -248,7 +282,7 @@ export async function GET(request: NextRequest) {
                         match,
                         courtsById.get(match.court_id),
                         hostsById.get(match.host_user_id),
-                        joinedMatchIds
+                        viewerJoinedMatchIds
                     )
                 ),
             },

@@ -15,10 +15,11 @@ import type {
   MatchResponse,
   MatchSummary,
   ProfileResponse,
+  StoredUser,
 } from "./tennis/types";
 
 type ProfileTab = "created" | "joined";
-type ProfileMatchAction = "cancel" | "leave";
+type ProfileMatchAction = "cancel" | "join" | "leave";
 
 type ProfilePageProps = {
   viewedUserId?: string;
@@ -70,7 +71,13 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
       setStatus("正在載入個人資料...");
 
       try {
-        const response = await fetch(`/api/profile?userId=${userId}`, {
+        const params = new URLSearchParams({ userId });
+
+        if (currentUser?.id) {
+          params.set("viewerUserId", currentUser.id);
+        }
+
+        const response = await fetch(`/api/profile?${params.toString()}`, {
           signal: controller.signal,
         });
         const data = (await response.json()) as ProfileResponse;
@@ -96,7 +103,7 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
     return () => {
       controller.abort();
     };
-  }, [targetUserId, profileRefreshKey]);
+  }, [targetUserId, currentUser?.id, profileRefreshKey]);
 
   async function handleLogout() {
     try {
@@ -138,9 +145,14 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
         return;
       }
 
-      setActionStatus(
-        data.message ?? (action === "cancel" ? "球局已取消。" : "已退出球局。")
-      );
+      const fallbackMessage =
+        action === "cancel"
+          ? "球局已取消。"
+          : action === "join"
+          ? "已加入球局。"
+          : "已退出球局。";
+
+      setActionStatus(data.message ?? fallbackMessage);
       setProfileRefreshKey((current) => current + 1);
     } catch {
       setActionStatus("網路連線異常，請稍後再試。");
@@ -155,6 +167,9 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
   const visibleStatus = targetUserId ? status : "請先登入後查看個人主頁。";
   const profileName = profile?.user?.nickname ?? currentUser?.name ?? "個人主頁";
   const profileEmail = profile?.user?.email ?? currentUser?.email ?? "";
+  const matchesTitle = isOwnProfile ? "我的球局" : `${profileName} 的球局`;
+  const createdTabLabel = isOwnProfile ? "我建立的" : `${profileName} 建立的`;
+  const joinedTabLabel = isOwnProfile ? "我參加的" : `${profileName} 參加的`;
 
   return (
     <main className="app-shell profile-shell">
@@ -244,7 +259,7 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
             <div className="profile-section-heading">
               <div>
                 <p className="eyebrow">Matches</p>
-                <h2>我的球局</h2>
+                <h2>{matchesTitle}</h2>
               </div>
               <div className="profile-tabs" aria-label="切換球局分類">
                 <button
@@ -253,7 +268,7 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
                   onClick={() => setActiveTab("created")}
                   type="button"
                 >
-                  我建立的
+                  {createdTabLabel}
                 </button>
                 <button
                   aria-pressed={activeTab === "joined"}
@@ -261,7 +276,7 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
                   onClick={() => setActiveTab("joined")}
                   type="button"
                 >
-                  我參加的
+                  {joinedTabLabel}
                 </button>
               </div>
             </div>
@@ -270,9 +285,8 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
               {visibleMatches.length > 0 ? (
                 visibleMatches.map((match) => (
                   <ProfileMatchCard
-                    action={activeTab === "created" ? "cancel" : "leave"}
+                    currentUser={currentUser}
                     isActing={actingMatchId === match.id}
-                    isOwnProfile={isOwnProfile}
                     key={match.id}
                     match={match}
                     onAction={handleMatchAction}
@@ -281,8 +295,12 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
               ) : (
                 <p className="empty-state">
                   {activeTab === "created"
-                    ? "你目前還沒有建立球局。"
-                    : "你目前還沒有參加別人的球局。"}
+                    ? isOwnProfile
+                      ? "你目前還沒有建立球局。"
+                      : `${profileName} 目前還沒有建立球局。`
+                    : isOwnProfile
+                    ? "你目前還沒有參加別人的球局。"
+                    : `${profileName} 目前還沒有參加別人的球局。`}
                 </p>
               )}
             </div>
@@ -294,17 +312,15 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
 }
 
 type ProfileMatchCardProps = {
-  action: ProfileMatchAction;
+  currentUser: StoredUser | null;
   isActing: boolean;
-  isOwnProfile: boolean;
   match: MatchSummary;
   onAction: (matchId: string, action: ProfileMatchAction) => void;
 };
 
 function ProfileMatchCard({
-  action,
+  currentUser,
   isActing,
-  isOwnProfile,
   match,
   onAction,
 }: ProfileMatchCardProps) {
@@ -315,8 +331,15 @@ function ProfileMatchCard({
       )}`
     : "";
   const isEnded = match.status === "已結束";
-  const actionLabel = action === "cancel" ? "取消" : "退出";
-  const pendingLabel = action === "cancel" ? "取消中" : "退出中";
+  const isFull = match.status === "已滿團";
+  const isHost = Boolean(currentUser && currentUser.id === match.host.id);
+  const actionConfig = getProfileMatchActionConfig({
+    hasCurrentUser: Boolean(currentUser),
+    hasJoined: match.hasJoined,
+    isEnded,
+    isFull,
+    isHost,
+  });
 
   return (
     <article className="profile-match-card">
@@ -356,17 +379,97 @@ function ProfileMatchCard({
           </span>
           <span>{formatFee(match.feePerPerson)} / 人</span>
         </div>
-        {isOwnProfile ? (
+        {actionConfig ? (
           <button
-            className={isEnded ? "full-match-button" : "cancel-match-button"}
-            disabled={isActing || isEnded}
-            onClick={() => onAction(match.id, action)}
+            className={actionConfig.className}
+            disabled={isActing || actionConfig.disabled}
+            onClick={() => {
+              if (actionConfig.action) {
+                onAction(match.id, actionConfig.action);
+              }
+            }}
             type="button"
           >
-            {isEnded ? "已結束" : isActing ? pendingLabel : actionLabel}
+            {isActing && actionConfig.action
+              ? actionConfig.pendingLabel
+              : actionConfig.label}
           </button>
         ) : null}
       </div>
     </article>
   );
+}
+
+type ProfileMatchActionConfig = {
+  action: ProfileMatchAction | null;
+  className: string;
+  disabled: boolean;
+  label: string;
+  pendingLabel: string;
+};
+
+function getProfileMatchActionConfig({
+  hasCurrentUser,
+  hasJoined,
+  isEnded,
+  isFull,
+  isHost,
+}: {
+  hasCurrentUser: boolean;
+  hasJoined: boolean;
+  isEnded: boolean;
+  isFull: boolean;
+  isHost: boolean;
+}): ProfileMatchActionConfig | null {
+  if (!hasCurrentUser) {
+    return null;
+  }
+
+  if (isEnded) {
+    return {
+      action: null,
+      className: "full-match-button",
+      disabled: true,
+      label: "已結束",
+      pendingLabel: "已結束",
+    };
+  }
+
+  if (isHost) {
+    return {
+      action: "cancel",
+      className: "cancel-match-button",
+      disabled: false,
+      label: "取消",
+      pendingLabel: "取消中",
+    };
+  }
+
+  if (hasJoined) {
+    return {
+      action: "leave",
+      className: "cancel-match-button",
+      disabled: false,
+      label: "退出",
+      pendingLabel: "退出中",
+    };
+  }
+
+  if (isFull) {
+    return {
+      action: null,
+      className: "full-match-button",
+      disabled: true,
+      label: "已滿團",
+      pendingLabel: "已滿團",
+    };
+  }
+
+  return {
+    action: "join",
+    className: "join-button",
+    disabled: false,
+    label: "加入",
+    pendingLabel: "加入中",
+  };
 }
