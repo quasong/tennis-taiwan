@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { closeExpiredMatches } from "./expiration";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -93,6 +94,18 @@ export async function GET(request: NextRequest) {
         const userId = searchParams.get("userId")?.trim();
         const supabase = createClient(supabaseUrl, supabaseKey);
         let scopedCourts: CourtRecord[] | null = null;
+
+        const { error: expirationError } = await closeExpiredMatches(supabase);
+
+        if (expirationError) {
+            return NextResponse.json(
+                {
+                    message: "更新過期球局狀態失敗。",
+                    error: expirationError.message,
+                },
+                { status: 500 }
+            );
+        }
 
         if (userId && !isValidUuid(userId)) {
             return NextResponse.json(
@@ -452,6 +465,18 @@ export async function PATCH(request: NextRequest) {
             return NextResponse.json(
                 { message: "matchId 或 userId 格式不正確。" },
                 { status: 400 }
+            );
+        }
+
+        const { error: expirationError } = await closeExpiredMatches(supabase);
+
+        if (expirationError) {
+            return NextResponse.json(
+                {
+                    message: "更新過期球局狀態失敗。",
+                    error: expirationError.message,
+                },
+                { status: 500 }
             );
         }
 

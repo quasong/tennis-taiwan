@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { closeExpiredMatches } from "../matches/expiration";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -116,6 +117,18 @@ export async function GET(request: NextRequest) {
         }
 
         const supabase = createClient(supabaseUrl, supabaseKey);
+        const { error: expirationError } = await closeExpiredMatches(supabase);
+
+        if (expirationError) {
+            return NextResponse.json(
+                {
+                    message: "更新過期球局狀態失敗。",
+                    error: expirationError.message,
+                },
+                { status: 500 }
+            );
+        }
+
         const { data: user, error: userError } = await supabase
             .from("users")
             .select("id, email, nickname, ntrp_level, preferred_court_id, created_at")
