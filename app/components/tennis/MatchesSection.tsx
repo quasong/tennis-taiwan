@@ -1,7 +1,10 @@
-import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatFee, formatMatchTime } from "./format";
 import { municipalities } from "./locations";
+import {
+  getMatchCardAction,
+  MatchCard,
+  type MatchCardActionType,
+} from "./MatchCard";
 import type {
   MatchResponse,
   MatchesResponse,
@@ -282,6 +285,20 @@ export function MatchesSection({
     }
   }
 
+  function handleMatchAction(matchId: string, action: MatchCardActionType) {
+    if (action === "cancel") {
+      handleCancelMatch(matchId);
+      return;
+    }
+
+    if (action === "leave") {
+      handleLeaveMatch(matchId);
+      return;
+    }
+
+    handleJoinMatch(matchId);
+  }
+
   return (
     <section className="match-column" aria-labelledby="matches-title">
       <div className="column-heading">
@@ -342,16 +359,14 @@ export function MatchesSection({
         ) : null}
 
         {openMatches.map((match) => (
-          <MatchCard
+          <OpenMatchCard
             currentUser={currentUser}
             isCancelling={cancellingMatchId === match.id}
             isJoining={joiningMatchId === match.id}
             isLeaving={leavingMatchId === match.id}
             key={match.id}
             match={match}
-            onCancelMatch={handleCancelMatch}
-            onJoinMatch={handleJoinMatch}
-            onLeaveMatch={handleLeaveMatch}
+            onAction={handleMatchAction}
           />
         ))}
       </div>
@@ -359,128 +374,36 @@ export function MatchesSection({
   );
 }
 
-type MatchCardProps = {
+type OpenMatchCardProps = {
   currentUser: StoredUser | null;
   isCancelling: boolean;
   isJoining: boolean;
   isLeaving: boolean;
   match: MatchSummary;
-  onCancelMatch: (matchId: string) => void;
-  onJoinMatch: (matchId: string) => void;
-  onLeaveMatch: (matchId: string) => void;
+  onAction: (matchId: string, action: MatchCardActionType) => void;
 };
 
-function MatchCard({
+function OpenMatchCard({
   currentUser,
   isCancelling,
   isJoining,
   isLeaving,
   match,
-  onCancelMatch,
-  onJoinMatch,
-  onLeaveMatch,
-}: MatchCardProps) {
-  const isHost = currentUser?.id === match.host.id;
-  const isFull = match.status === "已滿團";
-  const courtAddress = match.court?.address?.trim();
-  const hostEmail = match.host.email.trim();
-  const hostProfileHref = isHost ? "/profile" : `/profile/${match.host.id}`;
-  const mapsUrl = courtAddress
-    ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
-        courtAddress
-      )}`
-    : "";
+  onAction,
+}: OpenMatchCardProps) {
+  const pendingAction =
+    isCancelling ? "cancel" : isJoining ? "join" : isLeaving ? "leave" : null;
 
   return (
-    <article className="match-card">
-      <div className="match-card-content">
-        <div className="match-primary">
-          <p className="match-time">{formatMatchTime(match.playTime)}</p>
-          <div className="match-title-row">
-            <h3>{match.court?.name ?? "未知球場"}</h3>
-            {courtAddress ? (
-              <a
-                className="match-address-link"
-                href={mapsUrl}
-                rel="noopener noreferrer"
-                target="_blank"
-              >
-                {courtAddress}
-              </a>
-            ) : null}
-          </div>
-        </div>
-
-        <dl className="match-details" aria-label="球局資訊">
-          <div className="match-detail-row">
-            <dt>創建者</dt>
-            <dd>
-              <Link className="match-host-link" href={hostProfileHref}>
-                {match.host.nickname}
-              </Link>
-            </dd>
-          </div>
-          <div className="match-detail-row">
-            <dt>信箱</dt>
-            <dd>
-              {hostEmail ? (
-                <a className="match-email-link" href={`mailto:${hostEmail}`}>
-                  {hostEmail}
-                </a>
-              ) : (
-                "未提供"
-              )}
-            </dd>
-          </div>
-          {match.note ? (
-            <div className="match-detail-row match-note-row">
-              <dt>備註</dt>
-              <dd>{match.note}</dd>
-            </div>
-          ) : null}
-        </dl>
-      </div>
-      <div className="match-action-area">
-        <div className="match-meta">
-          <span className="match-status-pill">{match.status}</span>
-          <span className="player-count">
-            {match.joinedPlayers} / {match.requiredPlayers} 人
-          </span>
-          <span>{formatFee(match.feePerPerson)} / 人</span>
-        </div>
-        {isHost ? (
-          <button
-            className="cancel-match-button"
-            disabled={isCancelling}
-            onClick={() => onCancelMatch(match.id)}
-            type="button"
-          >
-            {isCancelling ? "取消中" : "取消"}
-          </button>
-        ) : match.hasJoined ? (
-          <button
-            className="cancel-match-button"
-            disabled={isLeaving}
-            onClick={() => onLeaveMatch(match.id)}
-            type="button"
-          >
-            {isLeaving ? "退出中" : "退出"}
-          </button>
-        ) : isFull ? (
-          <button className="full-match-button" disabled type="button">
-            已滿團
-          </button>
-        ) : (
-          <button
-            className="join-button"
-            disabled={isJoining}
-            onClick={() => onJoinMatch(match.id)}
-            type="button"
-          >
-            {isJoining ? "加入中" : "加入"}
-          </button>
-        )}
-      </div>
-    </article>
+    <MatchCard
+      action={getMatchCardAction({
+        currentUser,
+        match,
+        onAction,
+        pendingAction,
+      })}
+      currentUser={currentUser}
+      match={match}
+    />
   );
 }

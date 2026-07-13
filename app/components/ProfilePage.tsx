@@ -9,17 +9,16 @@ import {
   STORAGE_KEY,
   subscribeToAuthStore,
 } from "./tennis/authStore";
-import { formatFee, formatMatchTime } from "./tennis/format";
 import { Header } from "./tennis/Header";
-import type {
-  MatchResponse,
-  MatchSummary,
-  ProfileResponse,
-  StoredUser,
-} from "./tennis/types";
+import {
+  getMatchCardAction,
+  MatchCard,
+  type MatchCardActionType,
+} from "./tennis/MatchCard";
+import type { MatchResponse, ProfileResponse } from "./tennis/types";
 
 type ProfileTab = "created" | "joined";
-type ProfileMatchAction = "cancel" | "join" | "leave";
+type ProfileMatchAction = MatchCardActionType;
 
 type ProfilePageProps = {
   viewedUserId?: string;
@@ -45,6 +44,8 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
   const [actionStatus, setActionStatus] = useState("");
   const [activeTab, setActiveTab] = useState<ProfileTab>("created");
   const [actingMatchId, setActingMatchId] = useState<string | null>(null);
+  const [actingMatchAction, setActingMatchAction] =
+    useState<ProfileMatchAction | null>(null);
   const [profileRefreshKey, setProfileRefreshKey] = useState(0);
   const authSnapshot = useSyncExternalStore(
     subscribeToAuthStore,
@@ -125,6 +126,7 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
 
     setActionStatus("");
     setActingMatchId(matchId);
+    setActingMatchAction(action);
 
     try {
       const response = await fetch("/api/matches", {
@@ -158,6 +160,7 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
       setActionStatus("網路連線異常，請稍後再試。");
     } finally {
       setActingMatchId(null);
+      setActingMatchAction(null);
     }
   }
 
@@ -283,15 +286,24 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
 
             <div className="profile-match-list">
               {visibleMatches.length > 0 ? (
-                visibleMatches.map((match) => (
-                  <ProfileMatchCard
-                    currentUser={currentUser}
-                    isActing={actingMatchId === match.id}
-                    key={match.id}
-                    match={match}
-                    onAction={handleMatchAction}
-                  />
-                ))
+                visibleMatches.map((match) => {
+                  const pendingAction =
+                    actingMatchId === match.id ? actingMatchAction : null;
+
+                  return (
+                    <MatchCard
+                      action={getMatchCardAction({
+                        currentUser,
+                        match,
+                        onAction: handleMatchAction,
+                        pendingAction,
+                      })}
+                      currentUser={currentUser}
+                      key={match.id}
+                      match={match}
+                    />
+                  );
+                })
               ) : (
                 <p className="empty-state">
                   {activeTab === "created"
@@ -309,167 +321,4 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
       ) : null}
     </main>
   );
-}
-
-type ProfileMatchCardProps = {
-  currentUser: StoredUser | null;
-  isActing: boolean;
-  match: MatchSummary;
-  onAction: (matchId: string, action: ProfileMatchAction) => void;
-};
-
-function ProfileMatchCard({
-  currentUser,
-  isActing,
-  match,
-  onAction,
-}: ProfileMatchCardProps) {
-  const courtAddress = match.court?.address?.trim();
-  const mapsUrl = courtAddress
-    ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
-        courtAddress
-      )}`
-    : "";
-  const isEnded = match.status === "已結束";
-  const isFull = match.status === "已滿團";
-  const isHost = Boolean(currentUser && currentUser.id === match.host.id);
-  const actionConfig = getProfileMatchActionConfig({
-    hasCurrentUser: Boolean(currentUser),
-    hasJoined: match.hasJoined,
-    isEnded,
-    isFull,
-    isHost,
-  });
-
-  return (
-    <article className="profile-match-card">
-      <div className="profile-match-main">
-        <div className="profile-match-header">
-          <div>
-            <p className="match-time">{formatMatchTime(match.playTime)}</p>
-            <div className="match-title-row">
-              <h3>{match.court?.name ?? "未知球場"}</h3>
-              {courtAddress ? (
-                <a
-                  className="match-address-link"
-                  href={mapsUrl}
-                  rel="noopener noreferrer"
-                  target="_blank"
-                >
-                  {courtAddress}
-                </a>
-              ) : null}
-            </div>
-          </div>
-          <span className="profile-match-status">{match.status}</span>
-        </div>
-
-        <div className="profile-match-details">
-          <p>創建者：{match.host.nickname}</p>
-          {match.note ? (
-            <p className="profile-match-note">備註：{match.note}</p>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="profile-match-side">
-        <div className="profile-match-meta">
-          <span>
-            {match.joinedPlayers} / {match.requiredPlayers} 人
-          </span>
-          <span>{formatFee(match.feePerPerson)} / 人</span>
-        </div>
-        {actionConfig ? (
-          <button
-            className={actionConfig.className}
-            disabled={isActing || actionConfig.disabled}
-            onClick={() => {
-              if (actionConfig.action) {
-                onAction(match.id, actionConfig.action);
-              }
-            }}
-            type="button"
-          >
-            {isActing && actionConfig.action
-              ? actionConfig.pendingLabel
-              : actionConfig.label}
-          </button>
-        ) : null}
-      </div>
-    </article>
-  );
-}
-
-type ProfileMatchActionConfig = {
-  action: ProfileMatchAction | null;
-  className: string;
-  disabled: boolean;
-  label: string;
-  pendingLabel: string;
-};
-
-function getProfileMatchActionConfig({
-  hasCurrentUser,
-  hasJoined,
-  isEnded,
-  isFull,
-  isHost,
-}: {
-  hasCurrentUser: boolean;
-  hasJoined: boolean;
-  isEnded: boolean;
-  isFull: boolean;
-  isHost: boolean;
-}): ProfileMatchActionConfig | null {
-  if (!hasCurrentUser) {
-    return null;
-  }
-
-  if (isEnded) {
-    return {
-      action: null,
-      className: "full-match-button",
-      disabled: true,
-      label: "已結束",
-      pendingLabel: "已結束",
-    };
-  }
-
-  if (isHost) {
-    return {
-      action: "cancel",
-      className: "cancel-match-button",
-      disabled: false,
-      label: "取消",
-      pendingLabel: "取消中",
-    };
-  }
-
-  if (hasJoined) {
-    return {
-      action: "leave",
-      className: "cancel-match-button",
-      disabled: false,
-      label: "退出",
-      pendingLabel: "退出中",
-    };
-  }
-
-  if (isFull) {
-    return {
-      action: null,
-      className: "full-match-button",
-      disabled: true,
-      label: "已滿團",
-      pendingLabel: "已滿團",
-    };
-  }
-
-  return {
-    action: "join",
-    className: "join-button",
-    disabled: false,
-    label: "加入",
-    pendingLabel: "加入中",
-  };
 }
