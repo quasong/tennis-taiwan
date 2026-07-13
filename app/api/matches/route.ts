@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { closeExpiredMatches } from "./expiration";
+import { loadParticipantsByMatchId } from "./participants";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -182,6 +183,7 @@ export async function GET(request: NextRequest) {
             { data: courtRows, error: courtRowsError },
             { data: userRows, error: userRowsError },
             { data: participantRows, error: participantRowsError },
+            { data: participantsByMatchId, error: participantsError },
         ] = await Promise.all([
             supabase
                 .from("courts")
@@ -196,6 +198,7 @@ export async function GET(request: NextRequest) {
                       .eq("status", "已加入")
                       .in("match_id", matchIds)
                 : Promise.resolve({ data: [], error: null }),
+            loadParticipantsByMatchId(supabase, matchIds),
         ]);
 
         if (courtRowsError) {
@@ -217,6 +220,16 @@ export async function GET(request: NextRequest) {
                 {
                     message: "讀取參與狀態失敗。",
                     error: participantRowsError.message,
+                },
+                { status: 500 }
+            );
+        }
+
+        if (participantsError || !participantsByMatchId) {
+            return NextResponse.json(
+                {
+                    message: "讀取參與者資料失敗。",
+                    error: participantsError?.message,
                 },
                 { status: 500 }
             );
@@ -264,6 +277,7 @@ export async function GET(request: NextRequest) {
                             nickname:
                                 host?.nickname ?? host?.email ?? "未命名球友",
                         },
+                        participants: participantsByMatchId.get(match.id) ?? [],
                     };
                 }),
             },

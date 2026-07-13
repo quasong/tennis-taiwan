@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { closeExpiredMatches } from "../matches/expiration";
+import { loadParticipantsByMatchId } from "../matches/participants";
+import type { ParticipantSummary } from "../matches/participants";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -52,7 +54,8 @@ function toMatchSummary(
     match: MatchRecord,
     court: CourtRecord | undefined,
     host: UserRecord | undefined,
-    viewerJoinedMatchIds: Set<string>
+    viewerJoinedMatchIds: Set<string>,
+    participantsByMatchId: Map<string, ParticipantSummary[]>
 ) {
     return {
         id: match.id,
@@ -77,6 +80,7 @@ function toMatchSummary(
             email: host?.email ?? "",
             nickname: host?.nickname ?? host?.email ?? "未命名球友",
         },
+        participants: participantsByMatchId.get(match.id) ?? [],
     };
 }
 
@@ -218,6 +222,7 @@ export async function GET(request: NextRequest) {
             { data: courtRows, error: courtError },
             { data: hostRows, error: hostError },
             { data: viewerParticipantRows, error: viewerParticipantError },
+            { data: participantsByMatchId, error: participantsError },
         ] = await Promise.all([
             courtIds.length > 0
                 ? supabase
@@ -241,6 +246,7 @@ export async function GET(request: NextRequest) {
                       .eq("status", "已加入")
                       .in("match_id", matchIds)
                 : Promise.resolve({ data: [], error: null }),
+            loadParticipantsByMatchId(supabase, matchIds),
         ]);
 
         if (courtError) {
@@ -267,6 +273,16 @@ export async function GET(request: NextRequest) {
             );
         }
 
+        if (participantsError || !participantsByMatchId) {
+            return NextResponse.json(
+                {
+                    message: "讀取參與者資料失敗。",
+                    error: participantsError?.message,
+                },
+                { status: 500 }
+            );
+        }
+
         const courtsById = new Map(
             ((courtRows ?? []) as CourtRecord[]).map((court) => [court.id, court])
         );
@@ -287,7 +303,8 @@ export async function GET(request: NextRequest) {
                         match,
                         courtsById.get(match.court_id),
                         hostsById.get(match.host_user_id),
-                        viewerJoinedMatchIds
+                        viewerJoinedMatchIds,
+                        participantsByMatchId
                     )
                 ),
                 joinedMatches: joinedMatches.map((match) =>
@@ -295,7 +312,8 @@ export async function GET(request: NextRequest) {
                         match,
                         courtsById.get(match.court_id),
                         hostsById.get(match.host_user_id),
-                        viewerJoinedMatchIds
+                        viewerJoinedMatchIds,
+                        participantsByMatchId
                     )
                 ),
             },

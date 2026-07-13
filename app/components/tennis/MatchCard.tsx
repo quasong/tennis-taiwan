@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { formatFee, formatMatchTime } from "./format";
-import type { MatchSummary, StoredUser } from "./types";
+import type { MatchParticipant, MatchSummary, StoredUser } from "./types";
 
 export type MatchCardActionType = "cancel" | "delete" | "join" | "leave";
 
@@ -180,6 +180,69 @@ export function MatchCard({ action, currentUser, match }: MatchCardProps) {
           </button>
         ) : null}
       </div>
+      <ParticipantList currentUser={currentUser} match={match} />
     </article>
+  );
+}
+
+type ParticipantListProps = {
+  currentUser: StoredUser | null;
+  match: MatchSummary;
+};
+
+function ParticipantList({ currentUser, match }: ParticipantListProps) {
+  const participants = match.participants ?? [];
+
+  return (
+    <details className="match-participants-panel">
+      <summary>
+        <span>參與者名單</span>
+        <span>{participants.length} 人</span>
+      </summary>
+      {participants.length > 0 ? (
+        <div className="match-participant-list">
+          {participants.map((participant) => (
+            <ParticipantRow
+              currentUser={currentUser}
+              key={`${match.id}-${participant.id}`}
+              participant={participant}
+            />
+          ))}
+        </div>
+      ) : (
+        <p className="match-participant-empty">目前沒有參與者資料。</p>
+      )}
+    </details>
+  );
+}
+
+type ParticipantRowProps = {
+  currentUser: StoredUser | null;
+  participant: MatchParticipant;
+};
+
+function ParticipantRow({ currentUser, participant }: ParticipantRowProps) {
+  const profileHref =
+    currentUser?.id === participant.id ? "/profile" : `/profile/${participant.id}`;
+  const ntrpLabel =
+    participant.ntrpLevel === null ? "NTRP 未提供" : `NTRP ${participant.ntrpLevel}`;
+
+  return (
+    <div className="match-participant-row">
+      <Link className="match-host-link" href={profileHref}>
+        {participant.nickname}
+      </Link>
+      {participant.email ? (
+        <a className="match-email-link" href={`mailto:${participant.email}`}>
+          {participant.email}
+        </a>
+      ) : (
+        <span className="match-participant-muted">未提供信箱</span>
+      )}
+      <span className="match-participant-ntrp">{ntrpLabel}</span>
+      {participant.role ? (
+        <span className="match-participant-role">{participant.role}</span>
+      ) : null}
+    </div>
   );
 }

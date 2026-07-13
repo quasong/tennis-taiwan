@@ -61,6 +61,16 @@ export type MatchSummary = {
     email: string;
     nickname: string;
   };
+  participants: MatchParticipant[];
+};
+
+export type MatchParticipant = {
+  id: string;
+  email: string;
+  nickname: string;
+  ntrpLevel: number | null;
+  role: string | null;
+  status: string | null;
 };
 
 export type MatchesResponse = {
