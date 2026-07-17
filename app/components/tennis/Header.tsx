@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useI18n } from "../../i18n/I18nProvider";
+import { BrandMark } from "./BrandMark";
 import type { StoredUser } from "./types";
 
 type HeaderProps = {
@@ -25,7 +26,9 @@ export function Header({
   return (
     <header className="topbar">
       <Link className="brand" href="/" aria-label="Taiwan Tennis Match">
-        <span className="brand-mark">T</span>
+        <span className="brand-mark" aria-hidden="true">
+          <BrandMark className="brand-logo" />
+        </span>
         <span>
           <strong>Tennis Taiwan</strong>
           <small>{t("brand.subtitle")}</small>
