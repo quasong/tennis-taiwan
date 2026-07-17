@@ -31,6 +31,10 @@ function findMunicipality(result: NominatimResult) {
     );
 }
 
+function getCountryCode(result: NominatimResult) {
+    return result.address?.country_code?.trim().toLowerCase() || null;
+}
+
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const latitude = Number(searchParams.get("latitude"));
@@ -75,7 +79,11 @@ export async function GET(request: NextRequest) {
 
         if (!response.ok) {
             return NextResponse.json(
-                { city: null, message: "目前無法辨識所在城市。" },
+                {
+                    city: null,
+                    countryCode: null,
+                    message: "目前無法辨識所在城市。",
+                },
                 { status: 502 }
             );
         }
@@ -83,7 +91,10 @@ export async function GET(request: NextRequest) {
         const result = (await response.json()) as NominatimResult;
 
         return NextResponse.json(
-            { city: findMunicipality(result) },
+            {
+                city: findMunicipality(result),
+                countryCode: getCountryCode(result),
+            },
             {
                 status: 200,
                 headers: { "Cache-Control": "private, max-age=3600" },
@@ -91,7 +102,11 @@ export async function GET(request: NextRequest) {
         );
     } catch {
         return NextResponse.json(
-            { city: null, message: "目前無法辨識所在城市。" },
+            {
+                city: null,
+                countryCode: null,
+                message: "目前無法辨識所在城市。",
+            },
             { status: 502 }
         );
     }

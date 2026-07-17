@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "../../i18n/I18nProvider";
 import { getCityLabel } from "../../i18n/locationLabels";
+import { detectBrowserLocation } from "../../lib/clientLocation";
 import { handleUnauthorizedResponse } from "./authStore";
 import { formatApiMessage } from "./format";
 import { municipalities } from "./locations";
@@ -29,47 +30,6 @@ type CachedMatchesPage = {
   matches: MatchSummary[];
   total: number;
 };
-
-type LocationResponse = {
-  city?: string | null;
-};
-
-let detectedCityPromise: Promise<string | null> | null = null;
-
-function detectCurrentCity() {
-  if (typeof navigator === "undefined" || !navigator.geolocation) {
-    return Promise.resolve(null);
-  }
-
-  if (!detectedCityPromise) {
-    detectedCityPromise = new Promise((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        async ({ coords }) => {
-          try {
-            const params = new URLSearchParams({
-              latitude: String(coords.latitude),
-              longitude: String(coords.longitude),
-            });
-            const response = await fetch(`/api/location?${params.toString()}`);
-            const data = (await response.json()) as LocationResponse;
-
-            resolve(response.ok ? data.city ?? null : null);
-          } catch {
-            resolve(null);
-          }
-        },
-        () => resolve(null),
-        {
-          enableHighAccuracy: false,
-          maximumAge: 30 * 60 * 1000,
-          timeout: 8000,
-        }
-      );
-    });
-  }
-
-  return detectedCityPromise;
-}
 
 function getMatchesCacheKey(
   userId: string | undefined,
@@ -117,7 +77,7 @@ export function MatchesSection({
   useEffect(() => {
     let isActive = true;
 
-    void detectCurrentCity().then((city) => {
+    void detectBrowserLocation().then(({ city }) => {
       if (!isActive || !city || hasManuallySelectedCityRef.current) return;
 
       const isSupportedCity = municipalities.some(

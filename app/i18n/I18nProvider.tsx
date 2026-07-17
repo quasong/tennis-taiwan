@@ -11,8 +11,11 @@ import {
   type ReactNode,
 } from "react";
 import { messages, type Locale, type TranslationKey } from "./messages";
+import { detectBrowserLocation } from "../lib/clientLocation";
 
 const STORAGE_KEY = "tennis-taiwan-locale";
+const SOURCE_KEY = "tennis-taiwan-locale-source";
+const GREATER_CHINA_COUNTRY_CODES = new Set(["tw", "cn", "hk", "mo"]);
 type TranslationValues = Record<string, string | number>;
 
 type I18nContextValue = {
@@ -31,28 +34,47 @@ function interpolate(template: string, values?: TranslationValues) {
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>("zh-Hant");
-  const hasLoadedStoredLocale = useRef(false);
+  const [locale, setLocaleState] = useState<Locale>("en");
+  const hasManualSelection = useRef(false);
 
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
+    let isActive = true;
+    const timeoutId = window.setTimeout(async () => {
       const storedLocale = window.localStorage.getItem(STORAGE_KEY);
-      hasLoadedStoredLocale.current = true;
-      setLocaleState(storedLocale === "en" ? "en" : "zh-Hant");
+      if (storedLocale === "en" || storedLocale === "zh-Hant") {
+        if (isActive && !hasManualSelection.current) {
+          setLocaleState(storedLocale);
+        }
+        return;
+      }
+
+      const { countryCode } = await detectBrowserLocation();
+      if (!isActive || hasManualSelection.current) return;
+
+      const nextLocale =
+        countryCode && GREATER_CHINA_COUNTRY_CODES.has(countryCode.toLowerCase())
+          ? "zh-Hant"
+          : "en";
+
+      setLocaleState(nextLocale);
+      window.localStorage.setItem(STORAGE_KEY, nextLocale);
+      window.localStorage.setItem(SOURCE_KEY, "auto");
     }, 0);
 
-    return () => window.clearTimeout(timeoutId);
+    return () => {
+      isActive = false;
+      window.clearTimeout(timeoutId);
+    };
   }, []);
 
   useEffect(() => {
     document.documentElement.lang = locale;
-    if (hasLoadedStoredLocale.current) {
-      window.localStorage.setItem(STORAGE_KEY, locale);
-    }
   }, [locale]);
 
   const setLocale = useCallback((nextLocale: Locale) => {
-    hasLoadedStoredLocale.current = true;
+    hasManualSelection.current = true;
+    window.localStorage.setItem(STORAGE_KEY, nextLocale);
+    window.localStorage.setItem(SOURCE_KEY, "manual");
     setLocaleState(nextLocale);
   }, []);
   const t = useCallback(
