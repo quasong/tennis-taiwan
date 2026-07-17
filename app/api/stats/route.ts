@@ -9,6 +9,10 @@ type UserNtrpRecord = {
   ntrp_level: number | string | null;
 };
 
+type RecentMatchRecord = {
+  court_id: string;
+};
+
 function formatAverageNtrp(records: UserNtrpRecord[]) {
   const ntrpLevels = records
     .map((record) => Number(record.ntrp_level))
@@ -23,6 +27,10 @@ function formatAverageNtrp(records: UserNtrpRecord[]) {
   return Number((total / ntrpLevels.length).toFixed(1));
 }
 
+function countRecentCourts(records: RecentMatchRecord[]) {
+  return new Set(records.map((record) => record.court_id)).size;
+}
+
 export async function GET() {
   try {
     const supabaseKey = supabaseServiceRoleKey ?? supabasePublishableKey;
@@ -35,21 +43,45 @@ export async function GET() {
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
-    const { data, error } = await supabase
-      .from("users")
-      .select("ntrp_level")
-      .not("ntrp_level", "is", null);
+    const [usersResult, recentMatchesResult, allMatchesResult] = await Promise.all([
+      supabase
+        .from("users")
+        .select("ntrp_level")
+        .not("ntrp_level", "is", null),
+      supabase
+        .from("matches")
+        .select("court_id")
+        .in("status", ["徵求中", "已滿團"])
+        .gte("play_time", new Date().toISOString()),
+      supabase.from("matches").select("id", { count: "exact", head: true }),
+    ]);
 
-    if (error) {
+    if (
+      usersResult.error ||
+      recentMatchesResult.error ||
+      allMatchesResult.error
+    ) {
       return NextResponse.json(
-        { message: "讀取平台統計失敗。", error: error.message },
+        {
+          message: "讀取平台統計失敗。",
+          error:
+            usersResult.error?.message ??
+            recentMatchesResult.error?.message ??
+            allMatchesResult.error?.message,
+        },
         { status: 500 }
       );
     }
 
     return NextResponse.json(
       {
-        averageNtrp: formatAverageNtrp((data ?? []) as UserNtrpRecord[]),
+        averageNtrp: formatAverageNtrp(
+          (usersResult.data ?? []) as UserNtrpRecord[]
+        ),
+        recentCourtCount: countRecentCourts(
+          (recentMatchesResult.data ?? []) as RecentMatchRecord[]
+        ),
+        totalMatchCount: allMatchesResult.count ?? 0,
       },
       { status: 200 }
     );

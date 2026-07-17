@@ -4,26 +4,48 @@ import { useEffect, useState } from "react";
 
 type StatsResponse = {
   averageNtrp?: number | null;
+  recentCourtCount?: number;
+  totalMatchCount?: number;
 };
 
 export function Hero() {
   const [averageNtrp, setAverageNtrp] = useState("3.5");
+  const [recentCourtCount, setRecentCourtCount] = useState<number | null>(null);
+  const [totalMatchCount, setTotalMatchCount] = useState<number | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
 
-    async function loadAverageNtrp() {
+    async function loadStats() {
       try {
         const response = await fetch("/api/stats", {
           signal: controller.signal,
         });
         const data = (await response.json()) as StatsResponse;
 
-        if (!response.ok || data.averageNtrp === null || data.averageNtrp === undefined) {
+        if (!response.ok) {
           return;
         }
 
-        setAverageNtrp(data.averageNtrp.toFixed(1));
+        if (data.averageNtrp !== null && data.averageNtrp !== undefined) {
+          setAverageNtrp(data.averageNtrp.toFixed(1));
+        }
+
+        if (
+          data.recentCourtCount !== undefined &&
+          Number.isInteger(data.recentCourtCount) &&
+          data.recentCourtCount >= 0
+        ) {
+          setRecentCourtCount(data.recentCourtCount);
+        }
+
+        if (
+          data.totalMatchCount !== undefined &&
+          Number.isInteger(data.totalMatchCount) &&
+          data.totalMatchCount >= 0
+        ) {
+          setTotalMatchCount(data.totalMatchCount);
+        }
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
           return;
@@ -31,7 +53,7 @@ export function Hero() {
       }
     }
 
-    loadAverageNtrp();
+    loadStats();
 
     return () => {
       controller.abort();
@@ -48,12 +70,12 @@ export function Hero() {
         </p>
         <div className="quick-stats" aria-label="平台摘要">
           <span>
-            <strong>18</strong>
-            <small>開放球局</small>
+            <strong>{totalMatchCount ?? "—"}</strong>
+            <small>所有球局</small>
           </span>
           <span>
-            <strong>6</strong>
-            <small>熱門球場</small>
+            <strong>{recentCourtCount ?? "—"}</strong>
+            <small>近期球場</small>
           </span>
           <span>
             <strong>{averageNtrp}</strong>
