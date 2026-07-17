@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { formatApiMessage } from "./format";
 import { municipalities } from "./locations";
 import type { Court, CourtsResponse, MatchResponse, StoredUser } from "./types";
 
@@ -62,10 +63,10 @@ export function CreateMatchPanel({
         const response = await fetch(`/api/courts?${params.toString()}`, {
           signal: controller.signal,
         });
-        const data = (await response.json()) as CourtsResponse;
+      const data = (await response.json()) as CourtsResponse;
 
-        if (!response.ok) {
-          setCourtsStatus(data.message ?? data.error ?? "讀取球場資料失敗。");
+      if (!response.ok) {
+          setCourtsStatus(formatApiMessage(data, "讀取球場資料失敗。"));
           return;
         }
 
@@ -132,11 +133,11 @@ export function CreateMatchPanel({
       const data = (await response.json()) as MatchResponse;
 
       if (!response.ok) {
-        setCreateStatus(data.message ?? data.error ?? "建立球局失敗。");
+        setCreateStatus(formatApiMessage(data, "建立球局失敗。"));
         return;
       }
 
-      setCreateStatus(data.message ?? "約球建立成功。");
+      setCreateStatus(formatApiMessage(data, "約球建立成功。"));
       setSelectedCourtId("");
       setMatchTime("");
       setFee("0");

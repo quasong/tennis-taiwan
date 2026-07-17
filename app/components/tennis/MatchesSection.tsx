@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { formatApiMessage } from "./format";
 import { municipalities } from "./locations";
 import {
   getMatchCardAction,
@@ -102,7 +103,7 @@ export function MatchesSection({
         const data = (await response.json()) as MatchesResponse;
 
         if (!response.ok) {
-          setMatchesStatus(data.message ?? data.error ?? "讀取球局資料失敗。");
+          setMatchesStatus(formatApiMessage(data, "讀取球局資料失敗。"));
           return;
         }
 
@@ -188,11 +189,11 @@ export function MatchesSection({
       const data = (await response.json()) as MatchResponse;
 
       if (!response.ok) {
-        setActionStatus(data.message ?? data.error ?? "取消球局失敗。");
+        setActionStatus(formatApiMessage(data, "取消球局失敗。"));
         return;
       }
 
-      setActionStatus(data.message ?? "球局已取消。");
+      setActionStatus(formatApiMessage(data, "球局已取消。"));
       matchesCacheRef.current.clear();
       onMatchesChanged();
     } catch {
@@ -226,11 +227,11 @@ export function MatchesSection({
       const data = (await response.json()) as MatchResponse;
 
       if (!response.ok) {
-        setActionStatus(data.message ?? data.error ?? "刪除球局失敗。");
+        setActionStatus(formatApiMessage(data, "刪除球局失敗。"));
         return;
       }
 
-      setActionStatus(data.message ?? "球局已刪除。");
+      setActionStatus(formatApiMessage(data, "球局已刪除。"));
       matchesCacheRef.current.clear();
       onMatchesChanged();
     } catch {
@@ -265,7 +266,7 @@ export function MatchesSection({
       const data = (await response.json()) as MatchResponse;
 
       if (!response.ok) {
-        setActionStatus(data.message ?? data.error ?? "加入球局失敗。");
+        setActionStatus(formatApiMessage(data, "加入球局失敗。"));
         return;
       }
 
@@ -275,7 +276,7 @@ export function MatchesSection({
         return;
       }
 
-      setActionStatus(data.message ?? "已加入球局。");
+      setActionStatus(formatApiMessage(data, "已加入球局。"));
       matchesCacheRef.current.clear();
       onMatchesChanged();
     } catch {
@@ -310,11 +311,11 @@ export function MatchesSection({
       const data = (await response.json()) as MatchResponse;
 
       if (!response.ok) {
-        setActionStatus(data.message ?? data.error ?? "退出球局失敗。");
+        setActionStatus(formatApiMessage(data, "退出球局失敗。"));
         return;
       }
 
-      setActionStatus(data.message ?? "已退出球局。");
+      setActionStatus(formatApiMessage(data, "已退出球局。"));
       matchesCacheRef.current.clear();
       onMatchesChanged();
     } catch {

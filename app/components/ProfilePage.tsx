@@ -9,6 +9,7 @@ import {
   STORAGE_KEY,
   subscribeToAuthStore,
 } from "./tennis/authStore";
+import { formatApiMessage } from "./tennis/format";
 import { Header } from "./tennis/Header";
 import {
   getMatchCardAction,
@@ -84,7 +85,7 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
         const data = (await response.json()) as ProfileResponse;
 
         if (!response.ok) {
-          setStatus(data.message ?? data.error ?? "讀取個人資料失敗。");
+          setStatus(formatApiMessage(data, "讀取個人資料失敗。"));
           return;
         }
 
@@ -143,7 +144,7 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
       const data = (await response.json()) as MatchResponse;
 
       if (!response.ok) {
-        setActionStatus(data.message ?? data.error ?? "操作球局失敗。");
+        setActionStatus(formatApiMessage(data, "操作球局失敗。"));
         return;
       }
 
@@ -156,7 +157,7 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
           ? "已加入球局。"
           : "已退出球局。";
 
-      setActionStatus(data.message ?? fallbackMessage);
+      setActionStatus(formatApiMessage(data, fallbackMessage));
       setProfileRefreshKey((current) => current + 1);
     } catch {
       setActionStatus("網路連線異常，請稍後再試。");
