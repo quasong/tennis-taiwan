@@ -1,4 +1,43 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+type StatsResponse = {
+  averageNtrp?: number | null;
+};
+
 export function Hero() {
+  const [averageNtrp, setAverageNtrp] = useState("3.5");
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadAverageNtrp() {
+      try {
+        const response = await fetch("/api/stats", {
+          signal: controller.signal,
+        });
+        const data = (await response.json()) as StatsResponse;
+
+        if (!response.ok || data.averageNtrp === null || data.averageNtrp === undefined) {
+          return;
+        }
+
+        setAverageNtrp(data.averageNtrp.toFixed(1));
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+      }
+    }
+
+    loadAverageNtrp();
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
+
   return (
     <section className="overview">
       <div className="intro">
@@ -17,7 +56,7 @@ export function Hero() {
             <small>熱門球場</small>
           </span>
           <span>
-            <strong>3.5</strong>
+            <strong>{averageNtrp}</strong>
             <small>平均 NTRP</small>
           </span>
         </div>
