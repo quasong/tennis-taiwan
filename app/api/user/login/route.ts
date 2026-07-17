@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
 
         const { data: profile, error: profileError } = await supabase
             .from("users")
-            .select("id, email, nickname, ntrp_level, preferred_court_id, created_at")
+            .select("id, nickname, ntrp_level")
             .eq("id", data.user.id)
             .maybeSingle();
 

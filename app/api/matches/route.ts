@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { closeExpiredMatches } from "./expiration";
-import { loadParticipantsByMatchId } from "./participants";
+import {
+    loadParticipantsByMatchId,
+    loadVisibleParticipantContacts,
+} from "./participants";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -47,12 +50,7 @@ type MatchRecord = {
 
 type UserRecord = {
     id: string;
-    email: string | null;
     nickname: string | null;
-};
-
-type ParticipantRecord = {
-    match_id: string;
 };
 
 type MatchMutationResult = {
@@ -156,47 +154,57 @@ function createAuthenticatedSupabaseClient(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-    try {
-        const supabaseKey = supabaseServiceRoleKey ?? supabasePublishableKey;
+    const {
+        supabase: authenticatedSupabase,
+        applyCookies,
+    } = createAuthenticatedSupabaseClient(request);
+    const json = (body: Record<string, unknown>, status = 200) =>
+        applyCookies(
+            NextResponse.json(body, {
+                status,
+                headers: {
+                    "Cache-Control": "private, no-store",
+                    Vary: "Cookie",
+                },
+            })
+        );
 
-        if (!supabaseUrl || !supabaseKey) {
-            return NextResponse.json(
+    try {
+        if (!supabaseUrl || !supabaseServiceRoleKey) {
+            return json(
                 { message: "Supabase environment variables are missing." },
-                { status: 500 }
+                500
             );
         }
 
         const { searchParams } = new URL(request.url);
         const city = searchParams.get("city")?.trim();
         const district = searchParams.get("district")?.trim();
-        const userId = searchParams.get("userId")?.trim();
         const page = Number(searchParams.get("page") ?? "1");
-        const supabase = createClient(supabaseUrl, supabaseKey);
+        const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+        const {
+            data: { user: viewer },
+        } = authenticatedSupabase
+            ? await authenticatedSupabase.auth.getUser()
+            : { data: { user: null } };
         let scopedCourts: CourtRecord[] | null = null;
 
         const { error: expirationError } = await closeExpiredMatches(supabase);
 
         if (expirationError) {
-            return NextResponse.json(
+            return json(
                 {
                     message: "更新過期球局狀態失敗。",
                     error: expirationError.message,
                 },
-                { status: 500 }
-            );
-        }
-
-        if (userId && !isValidUuid(userId)) {
-            return NextResponse.json(
-                { message: "userId 格式不正確。" },
-                { status: 400 }
+                500
             );
         }
 
         if (!Number.isInteger(page) || page < 1) {
-            return NextResponse.json(
+            return json(
                 { message: "page 必須是大於 0 的整數。" },
-                { status: 400 }
+                400
             );
         }
 
@@ -213,16 +221,16 @@ export async function GET(request: NextRequest) {
             const { data: courts, error: courtsError } = await courtsQuery;
 
             if (courtsError) {
-                return NextResponse.json(
+                return json(
                     { message: "讀取球場資料失敗。", error: courtsError.message },
-                    { status: 500 }
+                    500
                 );
             }
 
             scopedCourts = (courts ?? []) as CourtRecord[];
 
             if (scopedCourts.length === 0) {
-                return NextResponse.json(
+                return json(
                     {
                         matches: [],
                         pagination: {
@@ -232,7 +240,7 @@ export async function GET(request: NextRequest) {
                             totalPages: 0,
                         },
                     },
-                    { status: 200 }
+                    200
                 );
             }
         }
@@ -266,9 +274,9 @@ export async function GET(request: NextRequest) {
         } = await matchesQuery;
 
         if (matchesError) {
-            return NextResponse.json(
+            return json(
                 { message: "讀取球局資料失敗。", error: matchesError.message },
-                { status: 500 }
+                500
             );
         }
 
@@ -282,10 +290,7 @@ export async function GET(request: NextRequest) {
         };
 
         if (matchRecords.length === 0) {
-            return NextResponse.json(
-                { matches: [], pagination },
-                { status: 200 }
-            );
+            return json({ matches: [], pagination });
         }
 
         const courtIds = Array.from(
@@ -299,56 +304,53 @@ export async function GET(request: NextRequest) {
         const [
             { data: courtRows, error: courtRowsError },
             { data: userRows, error: userRowsError },
-            { data: participantRows, error: participantRowsError },
-            { data: participantsByMatchId, error: participantsError },
+            { data: visibleContacts, error: contactsError },
         ] = await Promise.all([
             supabase
                 .from("courts")
                 .select("id, name, city, district, address")
                 .in("id", courtIds),
-            supabase.from("users").select("id, email, nickname").in("id", userIds),
-            userId
-                ? supabase
-                      .from("match_participants")
-                      .select("match_id")
-                      .eq("user_id", userId)
-                      .eq("status", "已加入")
-                      .in("match_id", matchIds)
-                : Promise.resolve({ data: [], error: null }),
-            loadParticipantsByMatchId(supabase, matchIds),
+            supabase.from("users").select("id, nickname").in("id", userIds),
+            loadVisibleParticipantContacts(
+                viewer ? authenticatedSupabase : null,
+                matchIds
+            ),
         ]);
 
         if (courtRowsError) {
-            return NextResponse.json(
+            return json(
                 { message: "讀取球場資料失敗。", error: courtRowsError.message },
-                { status: 500 }
+                500
             );
         }
 
         if (userRowsError) {
-            return NextResponse.json(
+            return json(
                 { message: "讀取創建者資料失敗。", error: userRowsError.message },
-                { status: 500 }
+                500
             );
         }
 
-        if (participantRowsError) {
-            return NextResponse.json(
+        if (contactsError || !visibleContacts) {
+            return json(
                 {
-                    message: "讀取參與狀態失敗。",
-                    error: participantRowsError.message,
+                    message: "讀取球局聯絡權限失敗。",
+                    error: contactsError?.message,
                 },
-                { status: 500 }
+                500
             );
         }
+
+        const { data: participantsByMatchId, error: participantsError } =
+            await loadParticipantsByMatchId(supabase, matchIds, visibleContacts);
 
         if (participantsError || !participantsByMatchId) {
-            return NextResponse.json(
+            return json(
                 {
                     message: "讀取參與者資料失敗。",
                     error: participantsError?.message,
                 },
-                { status: 500 }
+                500
             );
         }
 
@@ -358,13 +360,9 @@ export async function GET(request: NextRequest) {
         const usersById = new Map(
             ((userRows ?? []) as UserRecord[]).map((user) => [user.id, user])
         );
-        const joinedMatchIds = new Set(
-            ((participantRows ?? []) as ParticipantRecord[]).map(
-                (participant) => participant.match_id
-            )
-        );
+        const joinedMatchIds = new Set(visibleContacts.keys());
 
-        return NextResponse.json(
+        return json(
             {
                 matches: matchRecords.map((match) => {
                     const court = courtsById.get(match.court_id);
@@ -379,6 +377,7 @@ export async function GET(request: NextRequest) {
                         note: match.note,
                         status: match.status,
                         hasJoined: joinedMatchIds.has(match.id),
+                        canViewContacts: visibleContacts.has(match.id),
                         court: court
                             ? {
                                   id: court.id,
@@ -390,24 +389,26 @@ export async function GET(request: NextRequest) {
                             : null,
                         host: {
                             id: match.host_user_id,
-                            email: host?.email ?? "",
-                            nickname:
-                                host?.nickname ?? host?.email ?? "未命名球友",
+                            email:
+                                visibleContacts
+                                    .get(match.id)
+                                    ?.get(match.host_user_id) ?? "",
+                            nickname: host?.nickname ?? "未命名球友",
                         },
                         participants: participantsByMatchId.get(match.id) ?? [],
                     };
                 }),
                 pagination,
             },
-            { status: 200 }
+            200
         );
     } catch (error) {
-        return NextResponse.json(
+        return json(
             {
                 message: "伺服器發生未預期錯誤。",
                 error: error instanceof Error ? error.message : "Unknown error",
             },
-            { status: 500 }
+            500
         );
     }
 }

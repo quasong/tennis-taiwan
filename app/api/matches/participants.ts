@@ -9,9 +9,14 @@ type ParticipantRow = {
 
 type ParticipantUserRow = {
     id: string;
-    email: string | null;
     nickname: string | null;
     ntrp_level: number | null;
+};
+
+type ParticipantContactRow = {
+    match_id: string;
+    user_id: string;
+    email: string | null;
 };
 
 export type ParticipantSummary = {
@@ -23,9 +28,41 @@ export type ParticipantSummary = {
     status: string | null;
 };
 
+export type VisibleParticipantContacts = Map<string, Map<string, string>>;
+
+export async function loadVisibleParticipantContacts(
+    supabase: SupabaseClient | null,
+    matchIds: string[]
+) {
+    const contacts: VisibleParticipantContacts = new Map();
+
+    if (!supabase || matchIds.length === 0) {
+        return { data: contacts, error: null };
+    }
+
+    const { data, error } = await supabase.rpc(
+        "get_visible_match_participant_contacts",
+        { p_match_ids: matchIds }
+    );
+
+    if (error) {
+        return { data: null, error };
+    }
+
+    ((data ?? []) as ParticipantContactRow[]).forEach((contact) => {
+        const matchContacts = contacts.get(contact.match_id) ?? new Map();
+
+        matchContacts.set(contact.user_id, contact.email ?? "");
+        contacts.set(contact.match_id, matchContacts);
+    });
+
+    return { data: contacts, error: null };
+}
+
 export async function loadParticipantsByMatchId(
     supabase: SupabaseClient,
-    matchIds: string[]
+    matchIds: string[],
+    visibleContacts: VisibleParticipantContacts = new Map()
 ) {
     if (matchIds.length === 0) {
         return { data: new Map<string, ParticipantSummary[]>(), error: null };
@@ -52,7 +89,7 @@ export async function loadParticipantsByMatchId(
 
     const { data: userRows, error: userError } = await supabase
         .from("users")
-        .select("id, email, nickname, ntrp_level")
+        .select("id, nickname, ntrp_level")
         .in("id", userIds);
 
     if (userError) {
@@ -66,10 +103,13 @@ export async function loadParticipantsByMatchId(
 
     participants.forEach((participant) => {
         const user = usersById.get(participant.user_id);
+        const visibleEmail = visibleContacts
+            .get(participant.match_id)
+            ?.get(participant.user_id);
         const nextParticipant = {
             id: participant.user_id,
-            email: user?.email ?? "",
-            nickname: user?.nickname ?? user?.email ?? "未命名球友",
+            email: visibleEmail ?? "",
+            nickname: user?.nickname ?? "未命名球友",
             ntrpLevel: user?.ntrp_level ?? null,
             role: participant.role,
             status: participant.status,

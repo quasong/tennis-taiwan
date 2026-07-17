@@ -49,6 +49,7 @@ export type MatchSummary = {
   note: string | null;
   status: string;
   hasJoined: boolean;
+  canViewContacts: boolean;
   court: {
     id: string;
     name: string;
@@ -89,11 +90,11 @@ export type MatchesResponse = {
 
 export type ProfileUser = {
   id: string;
-  email: string | null;
+  email?: string | null;
   nickname: string | null;
   ntrp_level: number | null;
-  preferred_court_id: string | null;
-  created_at: string | null;
+  preferred_court_id?: string | null;
+  created_at?: string | null;
 };
 
 export type ProfileResponse = {

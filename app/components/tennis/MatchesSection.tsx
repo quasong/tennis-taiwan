@@ -169,10 +169,6 @@ export function MatchesSection({
       params.set("district", selectedMatchDistrict);
     }
 
-    if (currentUser?.id) {
-      params.set("userId", currentUser.id);
-    }
-
     params.set("page", String(currentPage));
 
     const controller = new AbortController();

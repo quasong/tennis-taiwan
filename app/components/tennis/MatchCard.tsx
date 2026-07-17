@@ -73,6 +73,7 @@ export function updateMatchParticipation(
   return {
     ...match,
     hasJoined,
+    canViewContacts: hasJoined,
     joinedPlayers,
     participants,
     status,
@@ -244,6 +245,7 @@ function ParticipantList({ currentUser, match }: ParticipantListProps) {
             <div className="match-participant-table-body">
               {displayParticipants.map((participant) => (
                 <ParticipantRow
+                  canViewContacts={match.canViewContacts}
                   currentUser={currentUser}
                   key={`${match.id}-${participant.id}`}
                   participant={participant}
@@ -271,11 +273,16 @@ function ParticipantList({ currentUser, match }: ParticipantListProps) {
 }
 
 type ParticipantRowProps = {
+  canViewContacts: boolean;
   currentUser: StoredUser | null;
   participant: MatchParticipant;
 };
 
-function ParticipantRow({ currentUser, participant }: ParticipantRowProps) {
+function ParticipantRow({
+  canViewContacts,
+  currentUser,
+  participant,
+}: ParticipantRowProps) {
   const profileHref =
     currentUser?.id === participant.id ? "/profile" : `/profile/${participant.id}`;
   const ntrpLabel =
@@ -292,7 +299,9 @@ function ParticipantRow({ currentUser, participant }: ParticipantRowProps) {
       >
         {participant.nickname}
       </Link>
-      {participant.email ? (
+      {!canViewContacts ? (
+        <span className="match-participant-muted">僅同局球友可查看</span>
+      ) : participant.email ? (
         <a className="match-email-link" href={`mailto:${participant.email}`}>
           {participant.email}
         </a>

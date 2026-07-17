@@ -106,10 +106,6 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
       try {
         const params = new URLSearchParams({ userId });
 
-        if (currentUser?.id) {
-          params.set("viewerUserId", currentUser.id);
-        }
-
         params.set("createdPage", String(createdPage));
         params.set("joinedPage", String(joinedPage));
 
@@ -323,7 +319,9 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
     activeTab === "created" ? createdMatchesTotal : joinedMatchesTotal;
   const visibleStatus = targetUserId ? status : "請先登入後查看個人主頁。";
   const profileName = profile?.user?.nickname ?? currentUser?.name ?? "個人主頁";
-  const profileEmail = profile?.user?.email ?? currentUser?.email ?? "";
+  const profileEmail = isOwnProfile
+    ? profile?.user?.email ?? currentUser?.email ?? ""
+    : "";
   const matchesTitle = isOwnProfile ? "我的球局" : `${profileName} 的球局`;
   const createdTabLabel = isOwnProfile ? "我建立的" : `${profileName} 建立的`;
   const joinedTabLabel = isOwnProfile ? "我參加的" : `${profileName} 參加的`;
@@ -362,7 +360,7 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
           <div>
             <p className="eyebrow">Profile</p>
             <h1 id="profile-title">{profileName}</h1>
-            <p>{profileEmail || "登入後查看完整個人資訊"}</p>
+            {isOwnProfile && profileEmail ? <p>{profileEmail}</p> : null}
           </div>
         </div>
         <Link className="ghost-button" href="/">
@@ -422,18 +420,20 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
                     )}
                   </dd>
                 </div>
-                <div>
-                  <dt>Email</dt>
-                  <dd>
-                    {profile.user?.email ? (
-                      <a href={`mailto:${profile.user.email}`}>
-                        {profile.user.email}
-                      </a>
-                    ) : (
-                      "未提供"
-                    )}
-                  </dd>
-                </div>
+                {isOwnProfile ? (
+                  <div>
+                    <dt>Email</dt>
+                    <dd>
+                      {profile.user?.email ? (
+                        <a href={`mailto:${profile.user.email}`}>
+                          {profile.user.email}
+                        </a>
+                      ) : (
+                        "未提供"
+                      )}
+                    </dd>
+                  </div>
+                ) : null}
                 <div>
                   <dt>NTRP</dt>
                   <dd>
@@ -460,10 +460,12 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
                     )}
                   </dd>
                 </div>
-                <div>
-                  <dt>加入日期</dt>
-                  <dd>{formatJoinDate(profile.user?.created_at)}</dd>
-                </div>
+                {isOwnProfile ? (
+                  <div>
+                    <dt>加入日期</dt>
+                    <dd>{formatJoinDate(profile.user?.created_at)}</dd>
+                  </div>
+                ) : null}
                 <div>
                   <dt>建立球局</dt>
                   <dd>{createdMatchesTotal} 場</dd>
