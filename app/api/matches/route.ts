@@ -7,6 +7,7 @@ import { loadParticipantsByMatchId } from "./participants";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const MATCHES_PAGE_SIZE = 10;
 
 type CreateMatchBody = {
     userId?: string;
@@ -169,6 +170,7 @@ export async function GET(request: NextRequest) {
         const city = searchParams.get("city")?.trim();
         const district = searchParams.get("district")?.trim();
         const userId = searchParams.get("userId")?.trim();
+        const page = Number(searchParams.get("page") ?? "1");
         const supabase = createClient(supabaseUrl, supabaseKey);
         let scopedCourts: CourtRecord[] | null = null;
 
@@ -187,6 +189,13 @@ export async function GET(request: NextRequest) {
         if (userId && !isValidUuid(userId)) {
             return NextResponse.json(
                 { message: "userId 格式不正確。" },
+                { status: 400 }
+            );
+        }
+
+        if (!Number.isInteger(page) || page < 1) {
+            return NextResponse.json(
+                { message: "page 必須是大於 0 的整數。" },
                 { status: 400 }
             );
         }
@@ -213,14 +222,27 @@ export async function GET(request: NextRequest) {
             scopedCourts = (courts ?? []) as CourtRecord[];
 
             if (scopedCourts.length === 0) {
-                return NextResponse.json({ matches: [] }, { status: 200 });
+                return NextResponse.json(
+                    {
+                        matches: [],
+                        pagination: {
+                            page,
+                            pageSize: MATCHES_PAGE_SIZE,
+                            total: 0,
+                            totalPages: 0,
+                        },
+                    },
+                    { status: 200 }
+                );
             }
         }
 
+        const pageStart = (page - 1) * MATCHES_PAGE_SIZE;
         let matchesQuery = supabase
             .from("matches")
             .select(
-                "id, host_user_id, court_id, play_time, required_players, joined_players, estimated_fee_per_person, note, status, created_at"
+                "id, host_user_id, court_id, play_time, required_players, joined_players, estimated_fee_per_person, note, status, created_at",
+                { count: "exact" }
             )
             .in("status", ["徵求中", "已滿團"])
             .order("play_time", { ascending: true });
@@ -232,7 +254,16 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        const { data: matches, error: matchesError } = await matchesQuery;
+        matchesQuery = matchesQuery.range(
+            pageStart,
+            pageStart + MATCHES_PAGE_SIZE - 1
+        );
+
+        const {
+            data: matches,
+            error: matchesError,
+            count: matchesCount,
+        } = await matchesQuery;
 
         if (matchesError) {
             return NextResponse.json(
@@ -242,9 +273,19 @@ export async function GET(request: NextRequest) {
         }
 
         const matchRecords = (matches ?? []) as MatchRecord[];
+        const totalMatches = matchesCount ?? 0;
+        const pagination = {
+            page,
+            pageSize: MATCHES_PAGE_SIZE,
+            total: totalMatches,
+            totalPages: Math.ceil(totalMatches / MATCHES_PAGE_SIZE),
+        };
 
         if (matchRecords.length === 0) {
-            return NextResponse.json({ matches: [] }, { status: 200 });
+            return NextResponse.json(
+                { matches: [], pagination },
+                { status: 200 }
+            );
         }
 
         const courtIds = Array.from(
@@ -356,6 +397,7 @@ export async function GET(request: NextRequest) {
                         participants: participantsByMatchId.get(match.id) ?? [],
                     };
                 }),
+                pagination,
             },
             { status: 200 }
         );

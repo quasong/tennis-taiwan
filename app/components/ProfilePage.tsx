@@ -22,6 +22,7 @@ import {
   MatchCard,
   type MatchCardActionType,
 } from "./tennis/MatchCard";
+import { MATCHES_PAGE_SIZE, Pagination } from "./tennis/Pagination";
 import type { MatchResponse, ProfileResponse } from "./tennis/types";
 
 type ProfileTab = "created" | "joined";
@@ -58,6 +59,8 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
   const [actingMatchAction, setActingMatchAction] =
     useState<ProfileMatchAction | null>(null);
   const [profileRefreshKey, setProfileRefreshKey] = useState(0);
+  const [createdPage, setCreatedPage] = useState(1);
+  const [joinedPage, setJoinedPage] = useState(1);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [editNickname, setEditNickname] = useState("");
@@ -94,6 +97,9 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
           params.set("viewerUserId", currentUser.id);
         }
 
+        params.set("createdPage", String(createdPage));
+        params.set("joinedPage", String(joinedPage));
+
         const response = await fetch(`/api/profile?${params.toString()}`, {
           signal: controller.signal,
         });
@@ -126,7 +132,13 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
     return () => {
       controller.abort();
     };
-  }, [targetUserId, currentUser?.id, profileRefreshKey]);
+  }, [
+    targetUserId,
+    currentUser?.id,
+    profileRefreshKey,
+    createdPage,
+    joinedPage,
+  ]);
 
   async function handleLogout() {
     try {
@@ -179,6 +191,8 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
           : "已退出球局。";
 
       setActionStatus(formatApiMessage(data, fallbackMessage));
+      setCreatedPage(1);
+      setJoinedPage(1);
       setProfileRefreshKey((current) => current + 1);
     } catch {
       setActionStatus("網路連線異常，請稍後再試。");
@@ -262,13 +276,33 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
 
   const createdMatches = profile?.createdMatches ?? [];
   const joinedMatches = profile?.joinedMatches ?? [];
+  const createdMatchesTotal =
+    profile?.pagination?.created.total ?? createdMatches.length;
+  const joinedMatchesTotal =
+    profile?.pagination?.joined.total ?? joinedMatches.length;
   const visibleMatches = activeTab === "created" ? createdMatches : joinedMatches;
+  const visiblePage = activeTab === "created" ? createdPage : joinedPage;
+  const visibleMatchesTotal =
+    activeTab === "created" ? createdMatchesTotal : joinedMatchesTotal;
   const visibleStatus = targetUserId ? status : "請先登入後查看個人主頁。";
   const profileName = profile?.user?.nickname ?? currentUser?.name ?? "個人主頁";
   const profileEmail = profile?.user?.email ?? currentUser?.email ?? "";
   const matchesTitle = isOwnProfile ? "我的球局" : `${profileName} 的球局`;
   const createdTabLabel = isOwnProfile ? "我建立的" : `${profileName} 建立的`;
   const joinedTabLabel = isOwnProfile ? "我參加的" : `${profileName} 參加的`;
+
+  function handleProfilePageChange(page: number) {
+    if (page < 1 || page === visiblePage) return;
+
+    setActionStatus("");
+
+    if (activeTab === "created") {
+      setCreatedPage(page);
+      return;
+    }
+
+    setJoinedPage(page);
+  }
 
   return (
     <main className="app-shell profile-shell">
@@ -395,11 +429,11 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
                 </div>
                 <div>
                   <dt>建立球局</dt>
-                  <dd>{createdMatches.length} 場</dd>
+                  <dd>{createdMatchesTotal} 場</dd>
                 </div>
                 <div>
                   <dt>參加球局</dt>
-                  <dd>{joinedMatches.length} 場</dd>
+                  <dd>{joinedMatchesTotal} 場</dd>
                 </div>
               </dl>
 
@@ -488,6 +522,14 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
                     : `${profileName} 目前還沒有參加別人的球局。`}
                 </p>
               )}
+
+              <Pagination
+                ariaLabel={`${matchesTitle}分頁`}
+                currentPage={visiblePage}
+                onPageChange={handleProfilePageChange}
+                pageSize={MATCHES_PAGE_SIZE}
+                totalItems={visibleMatchesTotal}
+              />
             </div>
           </section>
         </section>

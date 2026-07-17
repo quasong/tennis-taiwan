@@ -6,6 +6,7 @@ import {
   MatchCard,
   type MatchCardActionType,
 } from "./MatchCard";
+import { MATCHES_PAGE_SIZE, Pagination } from "./Pagination";
 import type {
   MatchResponse,
   MatchesResponse,
@@ -20,12 +21,20 @@ type MatchesSectionProps = {
   onRequireLogin: () => void;
 };
 
+type CachedMatchesPage = {
+  matches: MatchSummary[];
+  total: number;
+};
+
 function getMatchesCacheKey(
   userId: string | undefined,
   city: string,
-  district: string
+  district: string,
+  page: number
 ) {
-  return `${userId ?? "guest"}::${city || "all"}::${district || "all"}`;
+  return `${userId ?? "guest"}::${city || "all"}::${
+    district || "all"
+  }::page-${page}`;
 }
 
 export function MatchesSection({
@@ -43,7 +52,9 @@ export function MatchesSection({
   const [leavingMatchId, setLeavingMatchId] = useState<string | null>(null);
   const [selectedMatchCity, setSelectedMatchCity] = useState("");
   const [selectedMatchDistrict, setSelectedMatchDistrict] = useState("");
-  const matchesCacheRef = useRef(new Map<string, MatchSummary[]>());
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalMatches, setTotalMatches] = useState(0);
+  const matchesCacheRef = useRef(new Map<string, CachedMatchesPage>());
   const lastRefreshKeyRef = useRef(refreshKey);
 
   const matchDistrictOptions = useMemo(() => {
@@ -65,14 +76,16 @@ export function MatchesSection({
     const cacheKey = getMatchesCacheKey(
       currentUser?.id,
       selectedMatchCity,
-      selectedMatchDistrict
+      selectedMatchDistrict,
+      currentPage
     );
-    const cachedMatches = matchesCacheRef.current.get(cacheKey);
+    const cachedPage = matchesCacheRef.current.get(cacheKey);
 
-    if (cachedMatches) {
-      setOpenMatches(cachedMatches);
+    if (cachedPage) {
+      setOpenMatches(cachedPage.matches);
+      setTotalMatches(cachedPage.total);
       setMatchesStatus(
-        cachedMatches.length > 0 ? "" : "目前沒有符合條件的球局。"
+        cachedPage.matches.length > 0 ? "" : "目前沒有符合條件的球局。"
       );
       return;
     }
@@ -91,6 +104,8 @@ export function MatchesSection({
       params.set("userId", currentUser.id);
     }
 
+    params.set("page", String(currentPage));
+
     const controller = new AbortController();
 
     async function loadMatches() {
@@ -108,8 +123,14 @@ export function MatchesSection({
         }
 
         const nextMatches = data.matches ?? [];
-        matchesCacheRef.current.set(cacheKey, nextMatches);
+        const nextTotal = data.pagination?.total ?? nextMatches.length;
+
+        matchesCacheRef.current.set(cacheKey, {
+          matches: nextMatches,
+          total: nextTotal,
+        });
         setOpenMatches(nextMatches);
+        setTotalMatches(nextTotal);
         setMatchesStatus(nextMatches.length > 0 ? "" : "目前沒有符合條件的球局。");
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
@@ -125,44 +146,62 @@ export function MatchesSection({
     return () => {
       controller.abort();
     };
-  }, [currentUser?.id, selectedMatchCity, selectedMatchDistrict, refreshKey]);
+  }, [
+    currentUser?.id,
+    selectedMatchCity,
+    selectedMatchDistrict,
+    currentPage,
+    refreshKey,
+  ]);
 
-  function handleMatchCitySelect(city: string) {
-    const nextCity = selectedMatchCity === city ? "" : city;
-    const cacheKey = getMatchesCacheKey(currentUser?.id, nextCity, "");
-    const cachedMatches = matchesCacheRef.current.get(cacheKey);
+  function preparePage(
+    city: string,
+    district: string,
+    page: number
+  ) {
+    const cacheKey = getMatchesCacheKey(currentUser?.id, city, district, page);
+    const cachedPage = matchesCacheRef.current.get(cacheKey);
 
-    setSelectedMatchCity(nextCity);
-    setSelectedMatchDistrict("");
-    setOpenMatches(cachedMatches ?? []);
+    setOpenMatches(cachedPage?.matches ?? []);
+    setTotalMatches(cachedPage?.total ?? 0);
     setMatchesStatus(
-      cachedMatches
-        ? cachedMatches.length > 0
+      cachedPage
+        ? cachedPage.matches.length > 0
           ? ""
           : "目前沒有符合條件的球局。"
         : "正在載入球局..."
     );
+  }
+
+  function handleMatchCitySelect(city: string) {
+    const nextCity = selectedMatchCity === city ? "" : city;
+
+    setSelectedMatchCity(nextCity);
+    setSelectedMatchDistrict("");
+    setCurrentPage(1);
+    preparePage(nextCity, "", 1);
     setActionStatus("");
   }
 
   function handleMatchDistrictSelect(district: string) {
-    const cacheKey = getMatchesCacheKey(
-      currentUser?.id,
-      selectedMatchCity,
-      district
-    );
-    const cachedMatches = matchesCacheRef.current.get(cacheKey);
-
     setSelectedMatchDistrict(district);
-    setOpenMatches(cachedMatches ?? []);
-    setMatchesStatus(
-      cachedMatches
-        ? cachedMatches.length > 0
-          ? ""
-          : "目前沒有符合條件的球局。"
-        : "正在載入球局..."
-    );
+    setCurrentPage(1);
+    preparePage(selectedMatchCity, district, 1);
     setActionStatus("");
+  }
+
+  function handlePageChange(page: number) {
+    if (page === currentPage || page < 1) return;
+
+    setCurrentPage(page);
+    preparePage(selectedMatchCity, selectedMatchDistrict, page);
+    setActionStatus("");
+  }
+
+  function refreshMatchesAfterMutation() {
+    matchesCacheRef.current.clear();
+    setCurrentPage(1);
+    onMatchesChanged();
   }
 
   async function handleCancelMatch(matchId: string) {
@@ -194,8 +233,7 @@ export function MatchesSection({
       }
 
       setActionStatus(formatApiMessage(data, "球局已取消。"));
-      matchesCacheRef.current.clear();
-      onMatchesChanged();
+      refreshMatchesAfterMutation();
     } catch {
       setActionStatus("網路連線異常，請稍後再試。");
     } finally {
@@ -232,8 +270,7 @@ export function MatchesSection({
       }
 
       setActionStatus(formatApiMessage(data, "球局已刪除。"));
-      matchesCacheRef.current.clear();
-      onMatchesChanged();
+      refreshMatchesAfterMutation();
     } catch {
       setActionStatus("網路連線異常，請稍後再試。");
     } finally {
@@ -271,14 +308,12 @@ export function MatchesSection({
       }
 
       if (data.message === "你已經加入此球局。") {
-        matchesCacheRef.current.clear();
-        onMatchesChanged();
+        refreshMatchesAfterMutation();
         return;
       }
 
       setActionStatus(formatApiMessage(data, "已加入球局。"));
-      matchesCacheRef.current.clear();
-      onMatchesChanged();
+      refreshMatchesAfterMutation();
     } catch {
       setActionStatus("網路連線異常，請稍後再試。");
     } finally {
@@ -316,8 +351,7 @@ export function MatchesSection({
       }
 
       setActionStatus(formatApiMessage(data, "已退出球局。"));
-      matchesCacheRef.current.clear();
-      onMatchesChanged();
+      refreshMatchesAfterMutation();
     } catch {
       setActionStatus("網路連線異常，請稍後再試。");
     } finally {
@@ -415,6 +449,14 @@ export function MatchesSection({
             onAction={handleMatchAction}
           />
         ))}
+
+        <Pagination
+          ariaLabel="近期球局分頁"
+          currentPage={currentPage}
+          onPageChange={handlePageChange}
+          pageSize={MATCHES_PAGE_SIZE}
+          totalItems={totalMatches}
+        />
       </div>
     </section>
   );

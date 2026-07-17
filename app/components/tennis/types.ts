@@ -73,8 +73,16 @@ export type MatchParticipant = {
   status: string | null;
 };
 
+export type PaginationMeta = {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
 export type MatchesResponse = {
   matches?: MatchSummary[];
+  pagination?: PaginationMeta;
   message?: string;
   error?: string;
 };
@@ -92,6 +100,10 @@ export type ProfileResponse = {
   user?: ProfileUser;
   createdMatches?: MatchSummary[];
   joinedMatches?: MatchSummary[];
+  pagination?: {
+    created: PaginationMeta;
+    joined: PaginationMeta;
+  };
   message?: string;
   error?: string;
 };

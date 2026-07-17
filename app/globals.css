@@ -480,6 +480,96 @@ button {
   gap: 16px;
 }
 
+.match-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 10px 12px;
+  box-shadow: 0 8px 22px rgba(22, 38, 32, 0.05);
+}
+
+.match-pagination-summary {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.match-pagination-summary strong {
+  color: var(--navy);
+  font-size: 1rem;
+}
+
+.match-pagination-summary span {
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.match-pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  border-radius: 8px;
+  background: #f3f7f3;
+  padding: 4px;
+}
+
+.match-pagination-controls button {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  min-height: 34px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  padding: 0;
+  font-size: 0.84rem;
+  font-weight: 800;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.match-pagination-controls button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+  background: #fff4c8;
+  color: var(--navy);
+}
+
+.match-pagination-controls button.active {
+  border-color: var(--navy);
+  background: var(--navy);
+  color: #fff;
+}
+
+.match-pagination-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.3;
+}
+
+.match-pagination-controls .pagination-arrow {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.pagination-ellipsis {
+  display: grid;
+  width: 20px;
+  min-height: 34px;
+  place-items: center;
+  color: var(--muted);
+  font-weight: 800;
+}
+
 .empty-state {
   border: 1px dashed #c7d8cf;
   border-radius: 8px;
@@ -1356,6 +1446,22 @@ textarea:disabled {
   .match-district-field {
     width: 100%;
     max-width: none;
+  }
+
+  .match-pagination {
+    align-items: center;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .match-pagination-summary {
+    justify-content: center;
+  }
+
+  .match-pagination-controls {
+    justify-content: center;
+    max-width: 100%;
   }
 
   .match-details {

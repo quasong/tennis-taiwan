@@ -8,6 +8,7 @@ import type { ParticipantSummary } from "../matches/participants";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const PROFILE_MATCHES_PAGE_SIZE = 10;
 
 type CourtRecord = {
     id: string;
@@ -141,6 +142,8 @@ export async function GET(request: NextRequest) {
         const searchParams = new URL(request.url).searchParams;
         const userId = searchParams.get("userId")?.trim();
         const viewerUserId = searchParams.get("viewerUserId")?.trim();
+        const createdPage = Number(searchParams.get("createdPage") ?? "1");
+        const joinedPage = Number(searchParams.get("joinedPage") ?? "1");
 
         if (!userId) {
             return NextResponse.json(
@@ -159,6 +162,18 @@ export async function GET(request: NextRequest) {
         if (viewerUserId && !isValidUuid(viewerUserId)) {
             return NextResponse.json(
                 { message: "viewerUserId 格式不正確。" },
+                { status: 400 }
+            );
+        }
+
+        if (
+            !Number.isInteger(createdPage) ||
+            createdPage < 1 ||
+            !Number.isInteger(joinedPage) ||
+            joinedPage < 1
+        ) {
+            return NextResponse.json(
+                { message: "分頁參數格式不正確。" },
                 { status: 400 }
             );
         }
@@ -197,16 +212,21 @@ export async function GET(request: NextRequest) {
         }
 
         const [
-            { data: createdRows, error: createdError },
+            { data: createdRows, error: createdError, count: createdCount },
             { data: participantRows, error: participantError },
         ] = await Promise.all([
             supabase
                 .from("matches")
                 .select(
-                    "id, host_user_id, court_id, play_time, required_players, joined_players, estimated_fee_per_person, note, status, created_at"
+                    "id, host_user_id, court_id, play_time, required_players, joined_players, estimated_fee_per_person, note, status, created_at",
+                    { count: "exact" }
                 )
                 .eq("host_user_id", userId)
-                .order("play_time", { ascending: true }),
+                .order("play_time", { ascending: true })
+                .range(
+                    (createdPage - 1) * PROFILE_MATCHES_PAGE_SIZE,
+                    createdPage * PROFILE_MATCHES_PAGE_SIZE - 1
+                ),
             supabase
                 .from("match_participants")
                 .select("match_id, role, status")
@@ -235,16 +255,23 @@ export async function GET(request: NextRequest) {
             participantRecords.map((participant) => participant.match_id)
         );
 
-        const { data: joinedRows, error: joinedError } =
+        const joinedResult =
             profileJoinedMatchIds.size > 0
                 ? await supabase
                       .from("matches")
                       .select(
-                          "id, host_user_id, court_id, play_time, required_players, joined_players, estimated_fee_per_person, note, status, created_at"
+                          "id, host_user_id, court_id, play_time, required_players, joined_players, estimated_fee_per_person, note, status, created_at",
+                          { count: "exact" }
                       )
                       .in("id", Array.from(profileJoinedMatchIds))
                       .order("play_time", { ascending: true })
-                : { data: [], error: null };
+                      .range(
+                          (joinedPage - 1) * PROFILE_MATCHES_PAGE_SIZE,
+                          joinedPage * PROFILE_MATCHES_PAGE_SIZE - 1
+                      )
+                : { data: [], error: null, count: 0 };
+        const { data: joinedRows, error: joinedError, count: joinedCount } =
+            joinedResult;
 
         if (joinedError) {
             return NextResponse.json(
@@ -359,6 +386,24 @@ export async function GET(request: NextRequest) {
                         participantsByMatchId
                     )
                 ),
+                pagination: {
+                    created: {
+                        page: createdPage,
+                        pageSize: PROFILE_MATCHES_PAGE_SIZE,
+                        total: createdCount ?? 0,
+                        totalPages: Math.ceil(
+                            (createdCount ?? 0) / PROFILE_MATCHES_PAGE_SIZE
+                        ),
+                    },
+                    joined: {
+                        page: joinedPage,
+                        pageSize: PROFILE_MATCHES_PAGE_SIZE,
+                        total: joinedCount ?? 0,
+                        totalPages: Math.ceil(
+                            (joinedCount ?? 0) / PROFILE_MATCHES_PAGE_SIZE
+                        ),
+                    },
+                },
             },
             { status: 200 }
         );
