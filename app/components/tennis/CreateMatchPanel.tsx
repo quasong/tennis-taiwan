@@ -10,6 +10,8 @@ type CreateMatchPanelProps = {
   onRequireLogin: () => void;
 };
 
+const playerOptions = Array.from({ length: 7 }, (_, index) => index + 2);
+
 export function CreateMatchPanel({
   currentUser,
   onMatchCreated,
@@ -248,9 +250,11 @@ export function CreateMatchPanel({
               onChange={(event) => setMaxPlayers(event.target.value)}
               value={maxPlayers}
             >
-              <option value="2">2 人</option>
-              <option value="3">3 人</option>
-              <option value="4">4 人</option>
+              {playerOptions.map((players) => (
+                <option key={players} value={players}>
+                  {players} 人
+                </option>
+              ))}
             </select>
           </label>
 
