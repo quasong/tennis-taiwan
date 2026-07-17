@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  type FormEvent,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   emitAuthChange,
   getAuthSnapshot,
@@ -24,6 +30,10 @@ type ProfileMatchAction = MatchCardActionType;
 type ProfilePageProps = {
   viewedUserId?: string;
 };
+
+const ntrpLevels = Array.from({ length: 13 }, (_, index) =>
+  (1 + index * 0.5).toFixed(1)
+);
 
 function formatJoinDate(value: string | null | undefined) {
   if (!value) return "未提供";
@@ -48,6 +58,11 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
   const [actingMatchAction, setActingMatchAction] =
     useState<ProfileMatchAction | null>(null);
   const [profileRefreshKey, setProfileRefreshKey] = useState(0);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [editNickname, setEditNickname] = useState("");
+  const [editNtrpLevel, setEditNtrpLevel] = useState("3.0");
+  const [profileEditStatus, setProfileEditStatus] = useState("");
   const authSnapshot = useSyncExternalStore(
     subscribeToAuthStore,
     getAuthSnapshot,
@@ -90,6 +105,12 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
         }
 
         setProfile(data);
+        setEditNickname(data.user?.nickname ?? "");
+        setEditNtrpLevel(
+          data.user?.ntrp_level === null || data.user?.ntrp_level === undefined
+            ? "3.0"
+            : Number(data.user.ntrp_level).toFixed(1)
+        );
         setStatus("");
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
@@ -167,6 +188,78 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
     }
   }
 
+  function startEditingProfile() {
+    setEditNickname(profile?.user?.nickname ?? "");
+    setEditNtrpLevel(
+      profile?.user?.ntrp_level === null ||
+        profile?.user?.ntrp_level === undefined
+        ? "3.0"
+        : Number(profile.user.ntrp_level).toFixed(1)
+    );
+    setProfileEditStatus("");
+    setIsEditingProfile(true);
+  }
+
+  function cancelEditingProfile() {
+    setProfileEditStatus("");
+    setIsEditingProfile(false);
+  }
+
+  async function handleProfileSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!currentUser || !isOwnProfile) {
+      setProfileEditStatus("只能編輯自己的個人資料。");
+      return;
+    }
+
+    setIsSavingProfile(true);
+    setProfileEditStatus("");
+
+    try {
+      const response = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          nickname: editNickname,
+          ntrpLevel: Number(editNtrpLevel),
+        }),
+      });
+      const data = (await response.json()) as ProfileResponse;
+
+      if (!response.ok || !data.user) {
+        setProfileEditStatus(formatApiMessage(data, "更新個人資料失敗。"));
+        return;
+      }
+
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              user: data.user,
+            }
+          : current
+      );
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          ...currentUser,
+          name: data.user.nickname ?? currentUser.name,
+          ntrpLevel: data.user.ntrp_level ?? undefined,
+        })
+      );
+      emitAuthChange();
+      setIsEditingProfile(false);
+      setProfileEditStatus(data.message ?? "個人資料已更新。");
+    } catch {
+      setProfileEditStatus("網路連線異常，請稍後再試。");
+    } finally {
+      setIsSavingProfile(false);
+    }
+  }
+
   const createdMatches = profile?.createdMatches ?? [];
   const joinedMatches = profile?.joinedMatches ?? [];
   const visibleMatches = activeTab === "created" ? createdMatches : joinedMatches;
@@ -221,44 +314,121 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
       {targetUserId && profile ? (
         <section className="profile-grid" aria-label="個人資料與球局">
           <aside className="profile-panel">
-            <p className="eyebrow">Account</p>
-            <h2>個人資訊</h2>
-            <dl className="profile-info-list">
+            <div className="profile-account-heading">
               <div>
-                <dt>暱稱</dt>
-                <dd>{profile.user?.nickname ?? "未提供"}</dd>
+                <p className="eyebrow">Account</p>
+                <h2>個人資訊</h2>
               </div>
-              <div>
-                <dt>Email</dt>
-                <dd>
-                  {profile.user?.email ? (
-                    <a href={`mailto:${profile.user.email}`}>
-                      {profile.user.email}
-                    </a>
-                  ) : (
-                    "未提供"
-                  )}
-                </dd>
-              </div>
-              <div>
-                <dt>NTRP</dt>
-                <dd>
-                  {profile.user?.ntrp_level ?? currentUser?.ntrpLevel ?? "未提供"}
-                </dd>
-              </div>
-              <div>
-                <dt>加入日期</dt>
-                <dd>{formatJoinDate(profile.user?.created_at)}</dd>
-              </div>
-              <div>
-                <dt>建立球局</dt>
-                <dd>{createdMatches.length} 場</dd>
-              </div>
-              <div>
-                <dt>參加球局</dt>
-                <dd>{joinedMatches.length} 場</dd>
-              </div>
-            </dl>
+              {isOwnProfile && !isEditingProfile ? (
+                <button
+                  className="profile-edit-trigger"
+                  onClick={startEditingProfile}
+                  type="button"
+                >
+                  編輯
+                </button>
+              ) : null}
+            </div>
+            <form onSubmit={handleProfileSubmit}>
+              <dl className="profile-info-list">
+                <div>
+                  <dt>暱稱</dt>
+                  <dd>
+                    {isEditingProfile ? (
+                      <input
+                        aria-label="暱稱"
+                        className="profile-info-input"
+                        maxLength={40}
+                        minLength={2}
+                        onChange={(event) =>
+                          setEditNickname(event.target.value)
+                        }
+                        required
+                        value={editNickname}
+                      />
+                    ) : (
+                      profile.user?.nickname ?? "未提供"
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Email</dt>
+                  <dd>
+                    {profile.user?.email ? (
+                      <a href={`mailto:${profile.user.email}`}>
+                        {profile.user.email}
+                      </a>
+                    ) : (
+                      "未提供"
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt>NTRP</dt>
+                  <dd>
+                    {isEditingProfile ? (
+                      <select
+                        aria-label="NTRP"
+                        className="profile-info-input"
+                        onChange={(event) =>
+                          setEditNtrpLevel(event.target.value)
+                        }
+                        required
+                        value={editNtrpLevel}
+                      >
+                        {ntrpLevels.map((level) => (
+                          <option key={level} value={level}>
+                            {level}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      profile.user?.ntrp_level ??
+                      currentUser?.ntrpLevel ??
+                      "未提供"
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt>加入日期</dt>
+                  <dd>{formatJoinDate(profile.user?.created_at)}</dd>
+                </div>
+                <div>
+                  <dt>建立球局</dt>
+                  <dd>{createdMatches.length} 場</dd>
+                </div>
+                <div>
+                  <dt>參加球局</dt>
+                  <dd>{joinedMatches.length} 場</dd>
+                </div>
+              </dl>
+
+              {isEditingProfile ? (
+                <div className="profile-edit-actions">
+                  <button
+                    className="solid-button"
+                    disabled={isSavingProfile}
+                    type="submit"
+                  >
+                    {isSavingProfile ? "儲存中..." : "儲存"}
+                  </button>
+                  <button
+                    className="ghost-button"
+                    disabled={isSavingProfile}
+                    onClick={cancelEditingProfile}
+                    type="button"
+                  >
+                    取消
+                  </button>
+                </div>
+              ) : null}
+
+              {profileEditStatus ? (
+                <p className="profile-edit-message" role="status">
+                  {profileEditStatus}
+                </p>
+              ) : null}
+            </form>
           </aside>
 
           <section className="profile-panel profile-matches-panel">

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { closeExpiredMatches } from "../matches/expiration";
 import { loadParticipantsByMatchId } from "../matches/participants";
 import type { ParticipantSummary } from "../matches/participants";
@@ -43,6 +44,48 @@ type UserRecord = {
     preferred_court_id: string | null;
     created_at: string | null;
 };
+
+type UpdateProfileBody = {
+    nickname?: string;
+    ntrpLevel?: number;
+};
+
+function createAuthenticatedSupabaseClient(request: NextRequest) {
+    const cookiesToSet: {
+        name: string;
+        value: string;
+        options: CookieOptions;
+    }[] = [];
+
+    if (!supabaseUrl || !supabasePublishableKey) {
+        return {
+            supabase: null,
+            applyCookies: (response: NextResponse) => response,
+        };
+    }
+
+    const supabase = createServerClient(supabaseUrl, supabasePublishableKey, {
+        cookies: {
+            getAll() {
+                return request.cookies.getAll();
+            },
+            setAll(cookies) {
+                cookiesToSet.push(...cookies);
+            },
+        },
+    });
+
+    return {
+        supabase,
+        applyCookies(response: NextResponse) {
+            cookiesToSet.forEach(({ name, value, options }) => {
+                response.cookies.set(name, value, options);
+            });
+
+            return response;
+        },
+    };
+}
 
 function isValidUuid(value: string) {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -321,6 +364,99 @@ export async function GET(request: NextRequest) {
         );
     } catch (error) {
         return NextResponse.json(
+            {
+                message: "伺服器發生未預期錯誤。",
+                error: error instanceof Error ? error.message : "Unknown error",
+            },
+            { status: 500 }
+        );
+    }
+}
+
+export async function PATCH(request: NextRequest) {
+    const { supabase, applyCookies } = createAuthenticatedSupabaseClient(request);
+    const json = (
+        body: Record<string, unknown>,
+        init: { status: number }
+    ) => applyCookies(NextResponse.json(body, init));
+
+    try {
+        if (!supabase) {
+            return json(
+                { message: "Supabase 環境變數尚未設定。" },
+                { status: 500 }
+            );
+        }
+
+        const {
+            data: { user },
+            error: userError,
+        } = await supabase.auth.getUser();
+
+        if (userError || !user) {
+            return json(
+                { message: "請先登入後再編輯個人資料。", error: userError?.message },
+                { status: 401 }
+            );
+        }
+
+        const body = (await request.json()) as UpdateProfileBody;
+        const nickname = body.nickname?.trim();
+        const ntrpLevel = body.ntrpLevel;
+
+        if (!nickname || ntrpLevel === undefined) {
+            return json(
+                { message: "請填寫暱稱與 NTRP。" },
+                { status: 400 }
+            );
+        }
+
+        if (nickname.length < 2 || nickname.length > 40) {
+            return json(
+                { message: "暱稱長度必須介於 2 到 40 個字元。" },
+                { status: 400 }
+            );
+        }
+
+        if (
+            typeof ntrpLevel !== "number" ||
+            !Number.isFinite(ntrpLevel) ||
+            ntrpLevel < 1 ||
+            ntrpLevel > 7 ||
+            !Number.isInteger(ntrpLevel * 2)
+        ) {
+            return json(
+                { message: "NTRP 必須介於 1.0 到 7.0，並以 0.5 為間隔。" },
+                { status: 400 }
+            );
+        }
+
+        const { data: updatedUser, error: updateError } = await supabase
+            .from("users")
+            .update({
+                nickname,
+                ntrp_level: ntrpLevel,
+            })
+            .eq("id", user.id)
+            .select("id, email, nickname, ntrp_level, preferred_court_id, created_at")
+            .single();
+
+        if (updateError) {
+            return json(
+                { message: "更新個人資料失敗。", error: updateError.message },
+                { status: 500 }
+            );
+        }
+
+        return json(
+            {
+                message: "個人資料已更新。",
+                user: updatedUser as UserRecord,
+            },
+            { status: 200 }
+        );
+    } catch (error) {
+        return json(
             {
                 message: "伺服器發生未預期錯誤。",
                 error: error instanceof Error ? error.message : "Unknown error",

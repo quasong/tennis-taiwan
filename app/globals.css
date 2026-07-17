@@ -1110,6 +1110,33 @@ textarea:disabled {
   line-height: 1.1;
 }
 
+.profile-account-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.profile-edit-trigger {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--navy);
+  padding: 0 14px;
+  font-weight: 800;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.profile-edit-trigger:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+  background: #fff8dc;
+}
+
 .profile-info-list {
   display: grid;
   gap: 16px;
@@ -1140,6 +1167,29 @@ textarea:disabled {
   text-decoration-color: rgba(33, 107, 74, 0.38);
   text-decoration-thickness: 2px;
   text-underline-offset: 4px;
+}
+
+.profile-info-input {
+  min-height: 40px;
+  font-weight: 800;
+}
+
+.profile-edit-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.profile-edit-actions button {
+  min-width: 92px;
+}
+
+.profile-edit-message {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.45;
 }
 
 .profile-section-heading {
