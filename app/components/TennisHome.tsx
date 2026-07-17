@@ -7,6 +7,8 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { useI18n } from "../i18n/I18nProvider";
+import { formatApiMessage } from "./tennis/format";
 import {
   emitAuthChange,
   getAuthSnapshot,
@@ -23,6 +25,7 @@ import { MatchesSection } from "./tennis/MatchesSection";
 import type { ApiResponse, AuthMode, StoredUser } from "./tennis/types";
 
 export default function TennisHome() {
+  const { locale, t } = useI18n();
   const [authMode, setAuthMode] = useState<AuthMode | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -96,7 +99,7 @@ export default function TennisHome() {
       const data = (await response.json()) as ApiResponse;
 
       if (!response.ok) {
-        setStatusMessage(data.message ?? data.error ?? "操作失敗，請稍後再試。");
+        setStatusMessage(formatApiMessage(data, t("common.operationFailed"), locale));
         return;
       }
 
@@ -115,12 +118,12 @@ export default function TennisHome() {
       }
 
       setStatusMessage(
-        data.message ?? "註冊信已寄出，請完成 Email 驗證後再登入。"
+        formatApiMessage(data, t("auth.verificationSent"), locale)
       );
       setAuthMode("login");
       setPassword("");
     } catch {
-      setStatusMessage("網路連線異常，請稍後再試。");
+      setStatusMessage(t("common.networkError"));
     } finally {
       setIsSubmitting(false);
     }
@@ -153,7 +156,7 @@ export default function TennisHome() {
 
       <Hero />
 
-      <section className="workspace" aria-label="約球工作區">
+      <section className="workspace" aria-label={t("matches.workspace")}>
         <div className="content-grid">
           <MatchesSection
             currentUser={currentUser}

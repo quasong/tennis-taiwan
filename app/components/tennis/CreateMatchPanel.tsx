@@ -1,4 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useI18n } from "../../i18n/I18nProvider";
+import { getCityLabel, getSurfaceLabel } from "../../i18n/locationLabels";
 import { handleUnauthorizedResponse } from "./authStore";
 import { formatApiMessage } from "./format";
 import { municipalities } from "./locations";
@@ -17,6 +19,7 @@ export function CreateMatchPanel({
   onMatchCreated,
   onRequireLogin,
 }: CreateMatchPanelProps) {
+  const { locale, t } = useI18n();
   const [courts, setCourts] = useState<Court[]>([]);
   const [courtsStatus, setCourtsStatus] = useState("");
   const [selectedCity, setSelectedCity] = useState("");
@@ -44,10 +47,10 @@ export function CreateMatchPanel({
   );
 
   const courtPlaceholder = useMemo(() => {
-    if (!selectedCity) return "請先選擇城市";
+    if (!selectedCity) return t("create.selectCityFirst");
     if (courtsStatus) return courtsStatus;
-    return "選擇球場";
-  }, [courtsStatus, selectedCity]);
+    return t("create.selectCourt");
+  }, [courtsStatus, selectedCity, t]);
 
   useEffect(() => {
     if (!selectedCity) {
@@ -69,19 +72,19 @@ export function CreateMatchPanel({
       const data = (await response.json()) as CourtsResponse;
 
       if (!response.ok) {
-          setCourtsStatus(formatApiMessage(data, "讀取球場資料失敗。"));
+          setCourtsStatus(formatApiMessage(data, t("create.courtsFailed")));
           return;
         }
 
         const nextCourts = data.courts ?? [];
         setCourts(nextCourts);
-        setCourtsStatus(nextCourts.length > 0 ? "" : "這個條件目前沒有球場。");
+        setCourtsStatus(nextCourts.length > 0 ? "" : t("create.noCourts"));
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
           return;
         }
 
-        setCourtsStatus("無法讀取球場資料，請稍後再試。");
+        setCourtsStatus(t("create.courtsFailed"));
       }
     }
 
@@ -90,14 +93,14 @@ export function CreateMatchPanel({
     return () => {
       controller.abort();
     };
-  }, [selectedCity, selectedDistrict]);
+  }, [selectedCity, selectedDistrict, t]);
 
   function handleCitySelect(city: string) {
     setSelectedCity(city);
     setSelectedDistrict("");
     setSelectedCourtId("");
     setCourts([]);
-    setCourtsStatus("正在載入球場...");
+    setCourtsStatus(t("create.loadingCourts"));
     setCreateStatus("");
   }
 
@@ -107,12 +110,12 @@ export function CreateMatchPanel({
 
     if (!currentUser) {
       onRequireLogin();
-      setCreateStatus("請先登入後再建立球局。");
+      setCreateStatus(t("create.loginRequired"));
       return;
     }
 
     if (!selectedCity || !selectedCourtId || !matchTime) {
-      setCreateStatus("請選擇城市、球場和時間。");
+      setCreateStatus(t("create.missingFields"));
       return;
     }
 
@@ -140,18 +143,18 @@ export function CreateMatchPanel({
       }
 
       if (!response.ok) {
-        setCreateStatus(formatApiMessage(data, "建立球局失敗。"));
+        setCreateStatus(formatApiMessage(data, t("create.failed")));
         return;
       }
 
-      setCreateStatus(formatApiMessage(data, "約球建立成功。"));
+      setCreateStatus(formatApiMessage(data, t("create.success")));
       setSelectedCourtId("");
       setMatchTime("");
       setFee("0");
       setNotes("");
       onMatchCreated();
     } catch {
-      setCreateStatus("網路連線異常，請稍後再試。");
+      setCreateStatus(t("common.networkError"));
     } finally {
       setIsCreatingMatch(false);
     }
@@ -160,13 +163,13 @@ export function CreateMatchPanel({
   return (
     <aside className="create-column" aria-labelledby="create-title">
       <div className="column-heading">
-        <p className="eyebrow">Create</p>
-        <h2 id="create-title">發起新球局</h2>
+        <p className="eyebrow">{t("create.eyebrow")}</p>
+        <h2 id="create-title">{t("create.title")}</h2>
       </div>
       <div className="create-panel">
         <div className="city-field">
-          <span className="field-caption">選擇城市</span>
-          <div className="city-toggle" aria-label="選擇城市">
+          <span className="field-caption">{t("create.city")}</span>
+          <div className="city-toggle" aria-label={t("create.city")}>
             {municipalities.map(({ city }) => (
               <button
                 className={`filter-chip ${selectedCity === city ? "active" : ""}`}
@@ -174,26 +177,26 @@ export function CreateMatchPanel({
                 onClick={() => handleCitySelect(city)}
                 type="button"
               >
-                {city}
+                {getCityLabel(city, locale)}
               </button>
             ))}
           </div>
         </div>
         <form className="compact-form" onSubmit={handleCreateMatch}>
           <label>
-            行政區
+            {t("create.district")}
             <select
               disabled={!selectedCity || districtOptions.length === 0}
               onChange={(event) => {
                 setSelectedDistrict(event.target.value);
                 setSelectedCourtId("");
                 setCourts([]);
-                setCourtsStatus("正在載入球場...");
+                setCourtsStatus(t("create.loadingCourts"));
                 setCreateStatus("");
               }}
               value={selectedDistrict}
             >
-              <option value="">不限行政區</option>
+              <option value="">{t("create.allDistricts")}</option>
               {districtOptions.map((district) => (
                 <option key={district} value={district}>
                   {district}
@@ -203,7 +206,7 @@ export function CreateMatchPanel({
           </label>
 
           <label>
-            球場
+            {t("create.court")}
             <select
               disabled={!selectedCity}
               onChange={(event) => {
@@ -226,17 +229,17 @@ export function CreateMatchPanel({
           {selectedCourt ? (
             <div className="court-detail">
               <strong>{selectedCourt.name}</strong>
-              <span>{selectedCourt.address ?? "尚未提供地址"}</span>
+              <span>{selectedCourt.address ?? t("create.noAddress")}</span>
               <small>
-                {selectedCourt.city}
+                {getCityLabel(selectedCourt.city, locale)}
                 {selectedCourt.district ? ` / ${selectedCourt.district}` : ""}
-                {selectedCourt.surface ? ` / ${selectedCourt.surface}` : ""}
+                {selectedCourt.surface ? ` / ${getSurfaceLabel(selectedCourt.surface, locale)}` : ""}
               </small>
             </div>
           ) : null}
 
           <label>
-            時間
+            {t("create.time")}
             <input
               onChange={(event) => setMatchTime(event.target.value)}
               required
@@ -245,21 +248,21 @@ export function CreateMatchPanel({
             />
           </label>
           <label>
-            人數
+            {t("create.players")}
             <select
               onChange={(event) => setMaxPlayers(event.target.value)}
               value={maxPlayers}
             >
               {playerOptions.map((players) => (
                 <option key={players} value={players}>
-                  {players} 人
+                  {t("create.playerOption", { count: players })}
                 </option>
               ))}
             </select>
           </label>
 
           <label>
-            每人費用
+            {t("create.fee")}
             <input
               min="0"
               onChange={(event) => setFee(event.target.value)}
@@ -270,10 +273,10 @@ export function CreateMatchPanel({
           </label>
 
           <label>
-            備註
+            {t("create.note")}
             <textarea
               onChange={(event) => setNotes(event.target.value)}
-              placeholder="例：雙打、程度 3.0 以上、歡迎新朋友"
+              placeholder={t("create.notePlaceholder")}
               rows={3}
               value={notes}
             />
@@ -290,10 +293,10 @@ export function CreateMatchPanel({
             disabled={isCreatingMatch || Boolean(courtsStatus)}
           >
             {isCreatingMatch
-              ? "建立中..."
+              ? t("create.submitting")
               : currentUser
-                ? "建立球局"
-                : "登入後建立"}
+                ? t("create.submit")
+                : t("create.loginToSubmit")}
           </button>
         </form>
       </div>

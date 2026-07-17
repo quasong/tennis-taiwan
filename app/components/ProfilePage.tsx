@@ -8,6 +8,8 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { useI18n } from "../i18n/I18nProvider";
+import type { Locale } from "../i18n/messages";
 import {
   emitAuthChange,
   getAuthSnapshot,
@@ -43,10 +45,10 @@ const ntrpLevels = Array.from({ length: 13 }, (_, index) =>
   (1 + index * 0.5).toFixed(1)
 );
 
-function formatJoinDate(value: string | null | undefined) {
-  if (!value) return "未提供";
+function formatJoinDate(value: string | null | undefined, locale: Locale) {
+  if (!value) return null;
 
-  return new Intl.DateTimeFormat("zh-Hant-TW", {
+  return new Intl.DateTimeFormat(locale === "en" ? "en-US" : "zh-Hant-TW", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -58,8 +60,9 @@ function getUserInitial(name: string | null | undefined) {
 }
 
 export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
+  const { locale, t } = useI18n();
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
-  const [status, setStatus] = useState("正在載入個人資料...");
+  const [status, setStatus] = useState(() => t("profile.loading"));
   const [actionStatus, setActionStatus] = useState("");
   const [activeTab, setActiveTab] = useState<ProfileTab>("created");
   const [actingMatchId, setActingMatchId] = useState<string | null>(null);
@@ -101,7 +104,7 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
     const controller = new AbortController();
 
     async function loadProfile() {
-      setStatus("正在載入個人資料...");
+      setStatus(t("profile.loading"));
 
       try {
         const params = new URLSearchParams({ userId });
@@ -115,7 +118,7 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
         const data = (await response.json()) as ProfileResponse;
 
         if (!response.ok) {
-          setStatus(formatApiMessage(data, "讀取個人資料失敗。"));
+          setStatus(formatApiMessage(data, t("profile.loadFailed"), locale));
           return;
         }
 
@@ -132,7 +135,7 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
           return;
         }
 
-        setStatus("無法讀取個人資料，請稍後再試。");
+        setStatus(t("profile.loadFailed"));
       }
     }
 
@@ -147,6 +150,8 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
     profileRefreshKey,
     createdPage,
     joinedPage,
+    locale,
+    t,
   ]);
 
   async function handleLogout() {
@@ -163,7 +168,7 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
 
   async function handleMatchAction(matchId: string, action: ProfileMatchAction) {
     if (!currentUser) {
-      setActionStatus("請先登入後再操作球局。");
+      setActionStatus(t("auth.signInRequired"));
       return;
     }
 
@@ -188,18 +193,18 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
       handleUnauthorizedResponse(response);
 
       if (!response.ok) {
-        setActionStatus(formatApiMessage(data, "操作球局失敗。"));
+        setActionStatus(formatApiMessage(data, t("match.operationFailed"), locale));
         return;
       }
 
       const fallbackMessage =
         action === "cancel"
-          ? "球局已取消。"
+          ? t("match.canceled")
           : action === "delete"
-          ? "球局已刪除。"
+          ? t("match.deleted")
           : action === "join"
-          ? "已加入球局。"
-          : "已退出球局。";
+          ? t("match.joined")
+          : t("match.left");
 
       if (action === "join" || action === "leave") {
         const hasJoined = action === "join";
@@ -221,12 +226,12 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
         );
       }
 
-      setActionStatus(formatApiMessage(data, fallbackMessage));
+      setActionStatus(formatApiMessage(data, fallbackMessage, locale));
       setCreatedPage(1);
       setJoinedPage(1);
       setProfileRefreshKey((current) => current + 1);
     } catch {
-      setActionStatus("網路連線異常，請稍後再試。");
+      setActionStatus(t("common.networkError"));
     } finally {
       setActingMatchId(null);
       setActingMatchAction(null);
@@ -254,7 +259,7 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
     event.preventDefault();
 
     if (!currentUser || !isOwnProfile) {
-      setProfileEditStatus("只能編輯自己的個人資料。");
+      setProfileEditStatus(t("profile.editOwnOnly"));
       return;
     }
 
@@ -277,7 +282,7 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
       handleUnauthorizedResponse(response);
 
       if (!response.ok || !data.user) {
-        setProfileEditStatus(formatApiMessage(data, "更新個人資料失敗。"));
+        setProfileEditStatus(formatApiMessage(data, t("profile.updateFailed"), locale));
         return;
       }
 
@@ -299,9 +304,9 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
       );
       emitAuthChange();
       setIsEditingProfile(false);
-      setProfileEditStatus(data.message ?? "個人資料已更新。");
+      setProfileEditStatus(formatApiMessage(data, t("profile.updated"), locale));
     } catch {
-      setProfileEditStatus("網路連線異常，請稍後再試。");
+      setProfileEditStatus(t("common.networkError"));
     } finally {
       setIsSavingProfile(false);
     }
@@ -317,14 +322,20 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
   const visiblePage = activeTab === "created" ? createdPage : joinedPage;
   const visibleMatchesTotal =
     activeTab === "created" ? createdMatchesTotal : joinedMatchesTotal;
-  const visibleStatus = targetUserId ? status : "請先登入後查看個人主頁。";
-  const profileName = profile?.user?.nickname ?? currentUser?.name ?? "個人主頁";
+  const visibleStatus = targetUserId ? status : t("profile.loginRequired");
+  const profileName = profile?.user?.nickname ?? currentUser?.name ?? t("profile.page");
   const profileEmail = isOwnProfile
     ? profile?.user?.email ?? currentUser?.email ?? ""
     : "";
-  const matchesTitle = isOwnProfile ? "我的球局" : `${profileName} 的球局`;
-  const createdTabLabel = isOwnProfile ? "我建立的" : `${profileName} 建立的`;
-  const joinedTabLabel = isOwnProfile ? "我參加的" : `${profileName} 參加的`;
+  const matchesTitle = isOwnProfile
+    ? t("profile.myMatches")
+    : t("profile.otherMatches", { name: profileName });
+  const createdTabLabel = isOwnProfile
+    ? t("profile.createdByMe")
+    : t("profile.createdByOther", { name: profileName });
+  const joinedTabLabel = isOwnProfile
+    ? t("profile.joinedByMe")
+    : t("profile.joinedByOther", { name: profileName });
 
   function handleProfilePageChange(page: number) {
     if (page < 1 || page === visiblePage) return;
@@ -358,13 +369,13 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
             {getUserInitial(profileName || profileEmail)}
           </span>
           <div>
-            <p className="eyebrow">Profile</p>
+            <p className="eyebrow">{t("profile.eyebrow")}</p>
             <h1 id="profile-title">{profileName}</h1>
             {isOwnProfile && profileEmail ? <p>{profileEmail}</p> : null}
           </div>
         </div>
         <Link className="ghost-button" href="/">
-          返回首頁
+          {t("profile.backHome")}
         </Link>
       </section>
 
@@ -381,12 +392,12 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
       ) : null}
 
       {targetUserId && profile ? (
-        <section className="profile-grid" aria-label="個人資料與球局">
+        <section className="profile-grid" aria-label={t("profile.content")}>
           <aside className="profile-panel">
             <div className="profile-account-heading">
               <div>
-                <p className="eyebrow">Account</p>
-                <h2>個人資訊</h2>
+                <p className="eyebrow">{t("profile.accountEyebrow")}</p>
+                <h2>{t("profile.account")}</h2>
               </div>
               {isOwnProfile && !isEditingProfile ? (
                 <button
@@ -394,18 +405,18 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
                   onClick={startEditingProfile}
                   type="button"
                 >
-                  編輯
+                  {t("profile.edit")}
                 </button>
               ) : null}
             </div>
             <form onSubmit={handleProfileSubmit}>
               <dl className="profile-info-list">
                 <div>
-                  <dt>暱稱</dt>
+                  <dt>{t("profile.nickname")}</dt>
                   <dd>
                     {isEditingProfile ? (
                       <input
-                        aria-label="暱稱"
+                        aria-label={t("profile.nickname")}
                         className="profile-info-input"
                         maxLength={40}
                         minLength={2}
@@ -416,26 +427,26 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
                         value={editNickname}
                       />
                     ) : (
-                      profile.user?.nickname ?? "未提供"
+                      profile.user?.nickname ?? t("common.notProvided")
                     )}
                   </dd>
                 </div>
                 {isOwnProfile ? (
                   <div>
-                    <dt>Email</dt>
+                    <dt>{t("common.email")}</dt>
                     <dd>
                       {profile.user?.email ? (
                         <a href={`mailto:${profile.user.email}`}>
                           {profile.user.email}
                         </a>
                       ) : (
-                        "未提供"
+                        t("common.notProvided")
                       )}
                     </dd>
                   </div>
                 ) : null}
                 <div>
-                  <dt>NTRP</dt>
+                  <dt>{t("common.ntrp")}</dt>
                   <dd>
                     {isEditingProfile ? (
                       <select
@@ -456,23 +467,26 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
                     ) : (
                       profile.user?.ntrp_level ??
                       currentUser?.ntrpLevel ??
-                      "未提供"
+                      t("common.notProvided")
                     )}
                   </dd>
                 </div>
                 {isOwnProfile ? (
                   <div>
-                    <dt>加入日期</dt>
-                    <dd>{formatJoinDate(profile.user?.created_at)}</dd>
+                    <dt>{t("profile.joinDate")}</dt>
+                    <dd>
+                      {formatJoinDate(profile.user?.created_at, locale) ??
+                        t("common.notProvided")}
+                    </dd>
                   </div>
                 ) : null}
                 <div>
-                  <dt>建立球局</dt>
-                  <dd>{createdMatchesTotal} 場</dd>
+                  <dt>{t("profile.createdCount")}</dt>
+                  <dd>{t("common.matchesUnit", { count: createdMatchesTotal })}</dd>
                 </div>
                 <div>
-                  <dt>參加球局</dt>
-                  <dd>{joinedMatchesTotal} 場</dd>
+                  <dt>{t("profile.joinedCount")}</dt>
+                  <dd>{t("common.matchesUnit", { count: joinedMatchesTotal })}</dd>
                 </div>
               </dl>
 
@@ -483,7 +497,7 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
                     disabled={isSavingProfile}
                     type="submit"
                   >
-                    {isSavingProfile ? "儲存中..." : "儲存"}
+                    {isSavingProfile ? t("profile.saving") : t("profile.save")}
                   </button>
                   <button
                     className="ghost-button"
@@ -491,7 +505,7 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
                     onClick={cancelEditingProfile}
                     type="button"
                   >
-                    取消
+                    {t("profile.cancel")}
                   </button>
                 </div>
               ) : null}
@@ -507,10 +521,10 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
           <section className="profile-panel profile-matches-panel">
             <div className="profile-section-heading">
               <div>
-                <p className="eyebrow">Matches</p>
+                <p className="eyebrow">{t("profile.matchesEyebrow")}</p>
                 <h2>{matchesTitle}</h2>
               </div>
-              <div className="profile-tabs" aria-label="切換球局分類">
+              <div className="profile-tabs" aria-label={t("profile.switchTabs")}>
                 <button
                   aria-pressed={activeTab === "created"}
                   className={activeTab === "created" ? "active" : ""}
@@ -554,16 +568,16 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
                 <p className="empty-state">
                   {activeTab === "created"
                     ? isOwnProfile
-                      ? "你目前還沒有建立球局。"
-                      : `${profileName} 目前還沒有建立球局。`
+                      ? t("profile.emptyCreatedSelf")
+                      : t("profile.emptyCreatedOther", { name: profileName })
                     : isOwnProfile
-                    ? "你目前還沒有參加別人的球局。"
-                    : `${profileName} 目前還沒有參加別人的球局。`}
+                    ? t("profile.emptyJoinedSelf")
+                    : t("profile.emptyJoinedOther", { name: profileName })}
                 </p>
               )}
 
               <Pagination
-                ariaLabel={`${matchesTitle}分頁`}
+                ariaLabel={t("profile.pagination", { title: matchesTitle })}
                 currentPage={visiblePage}
                 onPageChange={handleProfilePageChange}
                 pageSize={MATCHES_PAGE_SIZE}

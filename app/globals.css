@@ -108,6 +108,58 @@ button {
   gap: 10px;
 }
 
+.language-switch {
+  display: inline-grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 3px;
+}
+
+.language-switch button {
+  min-width: 48px;
+  min-height: 34px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  padding: 0 10px;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.language-switch button:hover {
+  color: var(--ink);
+}
+
+.language-switch button.active {
+  background: var(--navy);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(23, 50, 77, 0.16);
+}
+
+.language-switch .language-short {
+  display: none;
+}
+
+@media (min-width: 521px) {
+  .language-switch .language-long {
+    display: inline;
+  }
+
+  .language-switch .language-short {
+    display: none;
+  }
+}
+
 .ghost-button,
 .solid-button,
 .filter-chip,
@@ -930,7 +982,7 @@ button {
   border-radius: 999px;
   background: var(--navy);
   color: #fff;
-  content: "創建者";
+  content: attr(data-role-label);
   font-size: 0.68rem;
   font-weight: 900;
   line-height: 1;
@@ -1597,6 +1649,19 @@ textarea:disabled {
   .auth-actions {
     max-width: 100%;
     justify-content: flex-start;
+  }
+
+  .language-switch button {
+    min-width: 38px;
+    padding: 0 7px;
+  }
+
+  .language-switch .language-long {
+    display: none;
+  }
+
+  .language-switch .language-short {
+    display: inline;
   }
 
   .intro h1 {

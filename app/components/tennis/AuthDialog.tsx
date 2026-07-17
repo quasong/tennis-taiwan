@@ -1,4 +1,7 @@
+"use client";
+
 import { FormEvent } from "react";
+import { useI18n } from "../../i18n/I18nProvider";
 import type { AuthMode } from "./types";
 
 type AuthDialogProps = {
@@ -50,8 +53,9 @@ export function AuthDialog({
   onPasswordChange,
   onSubmit,
 }: AuthDialogProps) {
-  const dialogTitle = authMode === "register" ? "建立帳號" : "登入帳號";
-  const primaryText = authMode === "register" ? "送出註冊" : "登入";
+  const { t } = useI18n();
+  const dialogTitle = authMode === "register" ? t("auth.registerTitle") : t("auth.loginTitle");
+  const primaryText = authMode === "register" ? t("auth.submitRegister") : t("auth.submitLogin");
 
   return (
     <div className="modal-backdrop" role="presentation">
@@ -67,7 +71,7 @@ export function AuthDialog({
             <h2 id="auth-title">{dialogTitle}</h2>
           </div>
           <button
-            aria-label="關閉"
+            aria-label={t("auth.close")}
             className="icon-button"
             type="button"
             onClick={onClose}
@@ -78,7 +82,7 @@ export function AuthDialog({
 
         <form className="auth-form" onSubmit={onSubmit}>
           <label>
-            Email
+            {t("auth.email")}
             <input
               autoComplete="email"
               inputMode="email"
@@ -90,7 +94,7 @@ export function AuthDialog({
           </label>
 
           <label>
-            密碼
+            {t("auth.password")}
             <input
               autoComplete={
                 authMode === "register" ? "new-password" : "current-password"
@@ -106,7 +110,7 @@ export function AuthDialog({
           {authMode === "register" ? (
             <>
               <label>
-                暱稱
+                {t("auth.nickname")}
                 <input
                   autoComplete="nickname"
                   minLength={2}
@@ -117,7 +121,7 @@ export function AuthDialog({
               </label>
 
               <label>
-                NTRP 程度
+                {t("auth.ntrp")}
                 <select
                   onChange={(event) => onNtrpLevelChange(event.target.value)}
                   required
@@ -140,7 +144,7 @@ export function AuthDialog({
           ) : null}
 
           <button className="solid-button full-width" disabled={isSubmitting}>
-            {isSubmitting ? "處理中..." : primaryText}
+            {isSubmitting ? t("auth.processing") : primaryText}
           </button>
         </form>
 
@@ -151,7 +155,7 @@ export function AuthDialog({
             onModeChange(authMode === "register" ? "login" : "register")
           }
         >
-          {authMode === "register" ? "已有帳號，改用登入" : "還沒有帳號，前往註冊"}
+          {authMode === "register" ? t("auth.switchToLogin") : t("auth.switchToRegister")}
         </button>
       </section>
     </div>

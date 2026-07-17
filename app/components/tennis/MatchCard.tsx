@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useI18n } from "../../i18n/I18nProvider";
 import { formatFee, formatMatchTime } from "./format";
 import type { MatchParticipant, MatchSummary, StoredUser } from "./types";
 
@@ -154,6 +155,7 @@ export function getMatchCardAction({
 }
 
 export function MatchCard({ action, currentUser, match }: MatchCardProps) {
+  const { locale, t } = useI18n();
   const courtAddress = match.court?.address?.trim();
   const mapsUrl = courtAddress
     ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
@@ -165,15 +167,16 @@ export function MatchCard({ action, currentUser, match }: MatchCardProps) {
     <article className="match-card">
       <div className="match-card-content">
         <div className="match-primary">
-          <p className="match-time">{formatMatchTime(match.playTime)}</p>
+          <p className="match-time">{formatMatchTime(match.playTime, locale)}</p>
           <div className="match-title-row">
-            <h3>{match.court?.name ?? "未知球場"}</h3>
+            <h3>{match.court?.name ?? t("match.unknownCourt")}</h3>
             {courtAddress ? (
               <a
                 className="match-address-link"
                 href={mapsUrl}
                 rel="noopener noreferrer"
                 target="_blank"
+                title={t("match.openMap")}
               >
                 {courtAddress}
               </a>
@@ -182,9 +185,9 @@ export function MatchCard({ action, currentUser, match }: MatchCardProps) {
         </div>
 
         {match.note ? (
-          <dl className="match-details" aria-label="球局資訊">
+          <dl className="match-details" aria-label={t("match.details")}>
             <div className="match-detail-row match-note-row">
-              <dt>備註</dt>
+              <dt>{t("match.note")}</dt>
               <dd>{match.note}</dd>
             </div>
           </dl>
@@ -193,11 +196,24 @@ export function MatchCard({ action, currentUser, match }: MatchCardProps) {
 
       <div className="match-action-area">
         <div className="match-meta">
-          <span className="match-status-pill">{match.status}</span>
-          <span className="player-count">
-            {match.joinedPlayers} / {match.requiredPlayers} 人
+          <span className="match-status-pill">
+            {match.status === "徵求中"
+              ? t("match.status.recruiting")
+              : match.status === "已滿團"
+                ? t("match.status.full")
+                : t("match.status.ended")}
           </span>
-          <span>{formatFee(match.feePerPerson)} / 人</span>
+          <span className="player-count">
+            {t("match.players", {
+              joined: match.joinedPlayers,
+              required: match.requiredPlayers,
+            })}
+          </span>
+          <span>
+            {t("match.perPerson", {
+              fee: formatFee(match.feePerPerson, locale),
+            })}
+          </span>
         </div>
         {action ? (
           <button
@@ -206,7 +222,10 @@ export function MatchCard({ action, currentUser, match }: MatchCardProps) {
             onClick={action.onClick}
             type="button"
           >
-            {action.isPending && action.type ? action.pendingLabel : action.label}
+            {translateActionLabel(
+              action.isPending && action.type ? action.pendingLabel : action.label,
+              t,
+            )}
           </button>
         ) : null}
       </div>
@@ -221,6 +240,7 @@ type ParticipantListProps = {
 };
 
 function ParticipantList({ currentUser, match }: ParticipantListProps) {
+  const { t } = useI18n();
   const [isExpanded, setIsExpanded] = useState(false);
   const participants = match.participants;
   const displayParticipants = useMemo(
@@ -232,15 +252,15 @@ function ParticipantList({ currentUser, match }: ParticipantListProps) {
   return (
     <section
       className={`match-participants-panel ${isExpanded ? "expanded" : ""}`}
-      aria-label="參與者名單"
+      aria-label={t("match.participants")}
     >
       {displayParticipants.length > 0 ? (
         <div className="match-participant-shell">
           <div className="match-participant-table">
             <div className="match-participant-table-head" aria-hidden="true">
-              <span>玩家</span>
-              <span>信箱</span>
-              <span>NTRP</span>
+              <span>{t("match.player")}</span>
+              <span>{t("match.email")}</span>
+              <span>{t("common.ntrp")}</span>
             </div>
             <div className="match-participant-table-body">
               {displayParticipants.map((participant) => (
@@ -256,7 +276,11 @@ function ParticipantList({ currentUser, match }: ParticipantListProps) {
           {canExpand ? (
             <button
               aria-expanded={isExpanded}
-              aria-label={isExpanded ? "收合參與者名單" : "展開全部參與者"}
+              aria-label={
+                isExpanded
+                  ? t("match.collapsePlayers")
+                  : t("match.expandPlayers")
+              }
               className="match-participant-toggle"
               onClick={() => setIsExpanded((current) => !current)}
               type="button"
@@ -266,7 +290,7 @@ function ParticipantList({ currentUser, match }: ParticipantListProps) {
           ) : null}
         </div>
       ) : (
-        <p className="match-participant-empty">目前沒有參與者資料。</p>
+        <p className="match-participant-empty">{t("match.noParticipants")}</p>
       )}
     </section>
   );
@@ -283,34 +307,60 @@ function ParticipantRow({
   currentUser,
   participant,
 }: ParticipantRowProps) {
+  const { t } = useI18n();
   const profileHref =
     currentUser?.id === participant.id ? "/profile" : `/profile/${participant.id}`;
   const ntrpLabel =
-    participant.ntrpLevel === null ? "未提供" : String(participant.ntrpLevel);
+    participant.ntrpLevel === null ? t("common.notProvided") : String(participant.ntrpLevel);
   const isCreator = participant.role === "創建者";
 
   return (
     <div className="match-participant-row">
       <Link
-        aria-label={isCreator ? `${participant.nickname}，創建者` : participant.nickname}
+        aria-label={
+          isCreator
+            ? `${participant.nickname}, ${t("match.creator")}`
+            : participant.nickname
+        }
         className={`match-host-link${isCreator ? " match-host-link-creator" : ""}`}
+        data-role-label={isCreator ? t("match.creator") : undefined}
         href={profileHref}
-        title={isCreator ? "創建者" : undefined}
+        title={isCreator ? t("match.creator") : undefined}
       >
         {participant.nickname}
       </Link>
       {!canViewContacts ? (
-        <span className="match-participant-muted">僅同局球友可查看</span>
+        <span className="match-participant-muted">{t("match.privateEmail")}</span>
       ) : participant.email ? (
         <a className="match-email-link" href={`mailto:${participant.email}`}>
           {participant.email}
         </a>
       ) : (
-        <span className="match-participant-muted">未提供信箱</span>
+        <span className="match-participant-muted">{t("match.noEmail")}</span>
       )}
       <span className="match-participant-ntrp">{ntrpLabel}</span>
     </div>
   );
+}
+
+function translateActionLabel(
+  label: string,
+  t: ReturnType<typeof useI18n>["t"],
+) {
+  const labels = {
+    刪除: "match.action.delete",
+    刪除中: "match.action.deleting",
+    已結束: "match.action.ended",
+    取消: "match.action.cancel",
+    取消中: "match.action.canceling",
+    退出: "match.action.leave",
+    退出中: "match.action.leaving",
+    已滿團: "match.action.full",
+    加入: "match.action.join",
+    加入中: "match.action.joining",
+  } as const;
+
+  return t(labels[label as keyof typeof labels] ?? "match.operationFailed");
 }
 
 function getDisplayParticipants(

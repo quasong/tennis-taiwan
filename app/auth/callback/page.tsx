@@ -4,9 +4,11 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { useI18n } from "../../i18n/I18nProvider";
 
 export default function AuthCallbackPage() {
-    const [message, setMessage] = useState("正在確認 Email...");
+    const { locale, t } = useI18n();
+    const [message, setMessage] = useState(() => t("auth.confirming"));
 
     useEffect(() => {
         async function handleCallback() {
@@ -15,7 +17,7 @@ export default function AuthCallbackPage() {
                 process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
             if (!supabaseUrl || !supabasePublishableKey) {
-                setMessage("Supabase 環境變數尚未設定。");
+                setMessage(t("common.missingSupabase"));
                 return;
             }
 
@@ -28,7 +30,9 @@ export default function AuthCallbackPage() {
 
             if (error) {
                 setMessage(
-                    `驗證失敗：${errorCode ?? error}。${errorDescription ?? ""}`
+                    locale === "en"
+                      ? `Verification failed: ${errorCode ?? error}. ${errorDescription ?? ""}`
+                      : `驗證失敗：${errorCode ?? error}。${errorDescription ?? ""}`
                 );
                 return;
             }
@@ -36,11 +40,11 @@ export default function AuthCallbackPage() {
             const { data, error: sessionError } = await supabase.auth.getSession();
 
             if (sessionError || !data.session) {
-                setMessage("驗證失敗，請重新登入或重新發送驗證信。");
+                setMessage(t("auth.confirmFailed"));
                 return;
             }
 
-            setMessage("Email 驗證成功，帳號已啟用。");
+            setMessage(t("auth.confirmed"));
 
             setTimeout(() => {
                 window.location.href = "/";
@@ -48,7 +52,7 @@ export default function AuthCallbackPage() {
         }
 
         handleCallback();
-    }, []);
+    }, [locale, t]);
 
     return (
         <main className="callback-page">

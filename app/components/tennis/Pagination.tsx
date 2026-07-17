@@ -1,3 +1,7 @@
+"use client";
+
+import { useI18n } from "../../i18n/I18nProvider";
+
 export const MATCHES_PAGE_SIZE = 10;
 
 type PaginationProps = {
@@ -40,6 +44,7 @@ export function Pagination({
   pageSize = MATCHES_PAGE_SIZE,
   totalItems,
 }: PaginationProps) {
+  const { t } = useI18n();
   const totalPages = Math.ceil(totalItems / pageSize);
 
   if (totalPages <= 1) return null;
@@ -54,15 +59,15 @@ export function Pagination({
         <strong>
           {firstVisibleItem}–{lastVisibleItem}
         </strong>
-        <span>共 {totalItems} 場</span>
+        <span>{t("common.matchesUnit", { count: totalItems })}</span>
       </div>
       <div className="match-pagination-controls">
         <button
-          aria-label="上一頁"
+          aria-label={t("pagination.previous")}
           className="pagination-arrow"
           disabled={currentPage === 1}
           onClick={() => onPageChange(currentPage - 1)}
-          title="上一頁"
+          title={t("pagination.previous")}
           type="button"
         >
           <span aria-hidden="true">‹</span>
@@ -71,7 +76,7 @@ export function Pagination({
         {paginationItems.map((item) =>
           typeof item === "number" ? (
             <button
-              aria-label={`第 ${item} 頁`}
+              aria-label={t("pagination.page", { page: item })}
               aria-current={item === currentPage ? "page" : undefined}
               className={item === currentPage ? "active" : ""}
               key={item}
@@ -88,11 +93,11 @@ export function Pagination({
         )}
 
         <button
-          aria-label="下一頁"
+          aria-label={t("pagination.next")}
           className="pagination-arrow"
           disabled={currentPage === totalPages}
           onClick={() => onPageChange(currentPage + 1)}
-          title="下一頁"
+          title={t("pagination.next")}
           type="button"
         >
           <span aria-hidden="true">›</span>

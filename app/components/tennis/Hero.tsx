@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useI18n } from "../../i18n/I18nProvider";
 
 type StatsResponse = {
   averageNtrp?: number | null;
@@ -9,6 +10,7 @@ type StatsResponse = {
 };
 
 export function Hero() {
+  const { t } = useI18n();
   const [averageNtrp, setAverageNtrp] = useState("3.5");
   const [recentCourtCount, setRecentCourtCount] = useState<number | null>(null);
   const [totalMatchCount, setTotalMatchCount] = useState<number | null>(null);
@@ -63,28 +65,26 @@ export function Hero() {
   return (
     <section className="overview">
       <div className="intro">
-        <p className="eyebrow">Taiwan tennis finder</p>
-        <h1>今天想打球，就從一場剛好的約球開始。</h1>
-        <p className="lead">
-          依城市、程度、時間快速找到球友。登入後即可建立自己的球局，讓臨時手癢變成穩定上場。
-        </p>
-        <div className="quick-stats" aria-label="平台摘要">
+        <p className="eyebrow">{t("hero.eyebrow")}</p>
+        <h1>{t("hero.title")}</h1>
+        <p className="lead">{t("hero.description")}</p>
+        <div className="quick-stats" aria-label={t("hero.summary")}>
           <span>
             <strong>{totalMatchCount ?? "—"}</strong>
-            <small>所有球局</small>
+            <small>{t("hero.totalMatches")}</small>
           </span>
           <span>
             <strong>{recentCourtCount ?? "—"}</strong>
-            <small>近期球場</small>
+            <small>{t("hero.recentCourts")}</small>
           </span>
           <span>
             <strong>{averageNtrp}</strong>
-            <small>平均 NTRP</small>
+            <small>{t("hero.averageNtrp")}</small>
           </span>
         </div>
       </div>
 
-      <div className="court-visual" aria-label="網球場視覺">
+      <div className="court-visual" aria-label={t("hero.visual")}>
         <div className="court-frame">
           <div className="court-line court-line-vertical" />
           <div className="court-line court-line-horizontal" />

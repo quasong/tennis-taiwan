@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useI18n } from "../../i18n/I18nProvider";
+import { getCityLabel } from "../../i18n/locationLabels";
 import { handleUnauthorizedResponse } from "./authStore";
 import { formatApiMessage } from "./format";
 import { municipalities } from "./locations";
@@ -86,8 +88,9 @@ export function MatchesSection({
   onMatchesChanged,
   onRequireLogin,
 }: MatchesSectionProps) {
+  const { locale, t } = useI18n();
   const [openMatches, setOpenMatches] = useState<MatchSummary[]>([]);
-  const [matchesStatus, setMatchesStatus] = useState("正在載入球局...");
+  const [matchesStatus, setMatchesStatus] = useState(() => t("matches.loading"));
   const [actionStatus, setActionStatus] = useState("");
   const [cancellingMatchId, setCancellingMatchId] = useState<string | null>(null);
   const [deletingMatchId, setDeletingMatchId] = useState<string | null>(null);
@@ -128,13 +131,13 @@ export function MatchesSection({
       setCurrentPage(1);
       setOpenMatches([]);
       setTotalMatches(0);
-      setMatchesStatus("正在載入附近球局...");
+      setMatchesStatus(t("matches.loadingNearby"));
     });
 
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (lastRefreshKeyRef.current !== refreshKey) {
@@ -154,7 +157,7 @@ export function MatchesSection({
       setOpenMatches(cachedPage.matches);
       setTotalMatches(cachedPage.total);
       setMatchesStatus(
-        cachedPage.matches.length > 0 ? "" : "目前沒有符合條件的球局。"
+        cachedPage.matches.length > 0 ? "" : t("matches.empty")
       );
       return;
     }
@@ -183,7 +186,7 @@ export function MatchesSection({
         const data = (await response.json()) as MatchesResponse;
 
         if (!response.ok) {
-          setMatchesStatus(formatApiMessage(data, "讀取球局資料失敗。"));
+          setMatchesStatus(formatApiMessage(data, t("matches.loadFailed"), locale));
           return;
         }
 
@@ -196,13 +199,13 @@ export function MatchesSection({
         });
         setOpenMatches(nextMatches);
         setTotalMatches(nextTotal);
-        setMatchesStatus(nextMatches.length > 0 ? "" : "目前沒有符合條件的球局。");
+        setMatchesStatus(nextMatches.length > 0 ? "" : t("matches.empty"));
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
           return;
         }
 
-        setMatchesStatus("無法讀取球局資料，請稍後再試。");
+        setMatchesStatus(t("matches.loadFailed"));
       }
     }
 
@@ -217,6 +220,8 @@ export function MatchesSection({
     selectedMatchDistrict,
     currentPage,
     refreshKey,
+    locale,
+    t,
   ]);
 
   function preparePage(
@@ -233,8 +238,8 @@ export function MatchesSection({
       cachedPage
         ? cachedPage.matches.length > 0
           ? ""
-          : "目前沒有符合條件的球局。"
-        : "正在載入球局..."
+          : t("matches.empty")
+        : t("matches.loading")
     );
   }
 
@@ -272,7 +277,7 @@ export function MatchesSection({
 
   async function handleCancelMatch(matchId: string) {
     if (!currentUser) {
-      setActionStatus("請先登入後再取消球局。");
+      setActionStatus(t("auth.signInRequired"));
       return;
     }
 
@@ -298,14 +303,14 @@ export function MatchesSection({
       }
 
       if (!response.ok) {
-        setActionStatus(formatApiMessage(data, "取消球局失敗。"));
+        setActionStatus(formatApiMessage(data, t("match.operationFailed"), locale));
         return;
       }
 
-      setActionStatus(formatApiMessage(data, "球局已取消。"));
+      setActionStatus(formatApiMessage(data, t("match.canceled"), locale));
       refreshMatchesAfterMutation();
     } catch {
-      setActionStatus("網路連線異常，請稍後再試。");
+      setActionStatus(t("common.networkError"));
     } finally {
       setCancellingMatchId(null);
     }
@@ -313,7 +318,7 @@ export function MatchesSection({
 
   async function handleDeleteMatch(matchId: string) {
     if (!currentUser) {
-      setActionStatus("請先登入後再刪除球局。");
+      setActionStatus(t("auth.signInRequired"));
       return;
     }
 
@@ -339,14 +344,14 @@ export function MatchesSection({
       }
 
       if (!response.ok) {
-        setActionStatus(formatApiMessage(data, "刪除球局失敗。"));
+        setActionStatus(formatApiMessage(data, t("match.operationFailed"), locale));
         return;
       }
 
-      setActionStatus(formatApiMessage(data, "球局已刪除。"));
+      setActionStatus(formatApiMessage(data, t("match.deleted"), locale));
       refreshMatchesAfterMutation();
     } catch {
-      setActionStatus("網路連線異常，請稍後再試。");
+      setActionStatus(t("common.networkError"));
     } finally {
       setDeletingMatchId(null);
     }
@@ -355,7 +360,7 @@ export function MatchesSection({
   async function handleJoinMatch(matchId: string) {
     if (!currentUser) {
       onRequireLogin();
-      setActionStatus("請先登入後再加入球局。");
+      setActionStatus(t("auth.signInRequired"));
       return;
     }
 
@@ -381,7 +386,7 @@ export function MatchesSection({
       }
 
       if (!response.ok) {
-        setActionStatus(formatApiMessage(data, "加入球局失敗。"));
+        setActionStatus(formatApiMessage(data, t("match.operationFailed"), locale));
         return;
       }
 
@@ -398,10 +403,10 @@ export function MatchesSection({
         return;
       }
 
-      setActionStatus(formatApiMessage(data, "已加入球局。"));
+      setActionStatus(formatApiMessage(data, t("match.joined"), locale));
       refreshMatchesAfterMutation();
     } catch {
-      setActionStatus("網路連線異常，請稍後再試。");
+      setActionStatus(t("common.networkError"));
     } finally {
       setJoiningMatchId(null);
     }
@@ -410,7 +415,7 @@ export function MatchesSection({
   async function handleLeaveMatch(matchId: string) {
     if (!currentUser) {
       onRequireLogin();
-      setActionStatus("請先登入後再退出球局。");
+      setActionStatus(t("auth.signInRequired"));
       return;
     }
 
@@ -436,7 +441,7 @@ export function MatchesSection({
       }
 
       if (!response.ok) {
-        setActionStatus(formatApiMessage(data, "退出球局失敗。"));
+        setActionStatus(formatApiMessage(data, t("match.operationFailed"), locale));
         return;
       }
 
@@ -448,10 +453,10 @@ export function MatchesSection({
         )
       );
 
-      setActionStatus(formatApiMessage(data, "已退出球局。"));
+      setActionStatus(formatApiMessage(data, t("match.left"), locale));
       refreshMatchesAfterMutation();
     } catch {
-      setActionStatus("網路連線異常，請稍後再試。");
+      setActionStatus(t("common.networkError"));
     } finally {
       setLeavingMatchId(null);
     }
@@ -479,16 +484,16 @@ export function MatchesSection({
   return (
     <section className="match-column" aria-labelledby="matches-title">
       <div className="column-heading">
-        <p className="eyebrow">Open matches</p>
-        <h2 id="matches-title">近期球局</h2>
+        <p className="eyebrow">{t("matches.eyebrow")}</p>
+        <h2 id="matches-title">{t("matches.title")}</h2>
       </div>
 
       <div className="match-list">
-        <div className="match-filter-panel" aria-label="篩選近期球局">
+        <div className="match-filter-panel" aria-label={t("matches.filterPanel")}>
           <div className="city-field">
             <div
               className="city-toggle match-city-toggle"
-              aria-label="選擇球局城市"
+              aria-label={t("matches.selectCity")}
             >
               {municipalities.map(({ city }) => (
                 <button
@@ -500,20 +505,20 @@ export function MatchesSection({
                   onClick={() => handleMatchCitySelect(city)}
                   type="button"
                 >
-                  {city}
+                  {getCityLabel(city, locale)}
                 </button>
               ))}
             </div>
           </div>
 
           <label className="match-district-field">
-            行政區
+            {t("matches.district")}
             <select
               disabled={!selectedMatchCity}
               onChange={(event) => handleMatchDistrictSelect(event.target.value)}
               value={selectedMatchDistrict}
             >
-              <option value="">不限行政區</option>
+              <option value="">{t("matches.allDistricts")}</option>
               {matchDistrictOptions.map((district) => (
                 <option key={district} value={district}>
                   {district}
@@ -549,7 +554,7 @@ export function MatchesSection({
         ))}
 
         <Pagination
-          ariaLabel="近期球局分頁"
+          ariaLabel={t("matches.pagination")}
           currentPage={currentPage}
           onPageChange={handlePageChange}
           pageSize={MATCHES_PAGE_SIZE}
