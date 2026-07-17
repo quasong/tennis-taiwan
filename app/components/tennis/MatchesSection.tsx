@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { handleUnauthorizedResponse } from "./authStore";
 import { formatApiMessage } from "./format";
 import { municipalities } from "./locations";
 import {
@@ -227,6 +228,10 @@ export function MatchesSection({
       });
       const data = (await response.json()) as MatchResponse;
 
+      if (handleUnauthorizedResponse(response)) {
+        onRequireLogin();
+      }
+
       if (!response.ok) {
         setActionStatus(formatApiMessage(data, "取消球局失敗。"));
         return;
@@ -263,6 +268,10 @@ export function MatchesSection({
         }),
       });
       const data = (await response.json()) as MatchResponse;
+
+      if (handleUnauthorizedResponse(response)) {
+        onRequireLogin();
+      }
 
       if (!response.ok) {
         setActionStatus(formatApiMessage(data, "刪除球局失敗。"));
@@ -301,6 +310,10 @@ export function MatchesSection({
         }),
       });
       const data = (await response.json()) as MatchResponse;
+
+      if (handleUnauthorizedResponse(response)) {
+        onRequireLogin();
+      }
 
       if (!response.ok) {
         setActionStatus(formatApiMessage(data, "加入球局失敗。"));
@@ -344,6 +357,10 @@ export function MatchesSection({
         }),
       });
       const data = (await response.json()) as MatchResponse;
+
+      if (handleUnauthorizedResponse(response)) {
+        onRequireLogin();
+      }
 
       if (!response.ok) {
         setActionStatus(formatApiMessage(data, "退出球局失敗。"));

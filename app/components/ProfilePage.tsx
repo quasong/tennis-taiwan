@@ -11,9 +11,11 @@ import {
 import {
   emitAuthChange,
   getAuthSnapshot,
+  handleUnauthorizedResponse,
   parseStoredUser,
   STORAGE_KEY,
   subscribeToAuthStore,
+  validateAuthSession,
 } from "./tennis/authStore";
 import { formatApiMessage } from "./tennis/format";
 import { Header } from "./tennis/Header";
@@ -78,6 +80,12 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
   );
   const targetUserId = viewedUserId ?? currentUser?.id;
   const isOwnProfile = Boolean(currentUser && targetUserId === currentUser.id);
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    void validateAuthSession();
+  }, [currentUser]);
 
   useEffect(() => {
     if (!targetUserId) {
@@ -176,6 +184,8 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
       });
       const data = (await response.json()) as MatchResponse;
 
+      handleUnauthorizedResponse(response);
+
       if (!response.ok) {
         setActionStatus(formatApiMessage(data, "操作球局失敗。"));
         return;
@@ -242,6 +252,8 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
         }),
       });
       const data = (await response.json()) as ProfileResponse;
+
+      handleUnauthorizedResponse(response);
 
       if (!response.ok || !data.user) {
         setProfileEditStatus(formatApiMessage(data, "更新個人資料失敗。"));

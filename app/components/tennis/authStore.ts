@@ -35,3 +35,35 @@ export function subscribeToAuthStore(onStoreChange: () => void) {
 export function emitAuthChange() {
   window.dispatchEvent(new Event("tennis-auth-change"));
 }
+
+export function clearStoredUser() {
+  if (typeof window === "undefined") return;
+
+  window.localStorage.removeItem(STORAGE_KEY);
+  emitAuthChange();
+}
+
+export function handleUnauthorizedResponse(response: Response) {
+  if (response.status !== 401) return false;
+
+  clearStoredUser();
+  return true;
+}
+
+export async function validateAuthSession() {
+  try {
+    const response = await fetch("/api/user/login", {
+      cache: "no-store",
+      credentials: "same-origin",
+    });
+
+    if (response.status === 401) {
+      clearStoredUser();
+      return false;
+    }
+
+    return response.ok;
+  } catch {
+    return false;
+  }
+}

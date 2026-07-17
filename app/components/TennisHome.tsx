@@ -1,12 +1,19 @@
 "use client";
 
-import { FormEvent, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  FormEvent,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   emitAuthChange,
   getAuthSnapshot,
   parseStoredUser,
   STORAGE_KEY,
   subscribeToAuthStore,
+  validateAuthSession,
 } from "./tennis/authStore";
 import { AuthDialog } from "./tennis/AuthDialog";
 import { CreateMatchPanel } from "./tennis/CreateMatchPanel";
@@ -34,6 +41,12 @@ export default function TennisHome() {
     () => parseStoredUser(authSnapshot),
     [authSnapshot]
   );
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    void validateAuthSession();
+  }, [currentUser]);
 
   function resetForm(nextMode: AuthMode) {
     setAuthMode(nextMode);

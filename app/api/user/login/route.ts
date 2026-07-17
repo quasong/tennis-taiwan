@@ -15,6 +15,65 @@ function isValidEmail(email: string) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+export async function GET(request: NextRequest) {
+    const cookiesToSet: {
+        name: string;
+        value: string;
+        options: CookieOptions;
+    }[] = [];
+    const json = (body: Record<string, unknown>, status: number) => {
+        const response = NextResponse.json(body, { status });
+
+        cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options);
+        });
+
+        return response;
+    };
+
+    try {
+        if (!supabaseUrl || !supabasePublishableKey) {
+            return json({ message: "Supabase 環境變數尚未設定。" }, 500);
+        }
+
+        const supabase = createServerClient(
+            supabaseUrl,
+            supabasePublishableKey,
+            {
+                cookies: {
+                    getAll() {
+                        return request.cookies.getAll();
+                    },
+                    setAll(cookies) {
+                        cookiesToSet.push(...cookies);
+                    },
+                },
+            }
+        );
+        const {
+            data: { user },
+            error,
+        } = await supabase.auth.getUser();
+
+        if (error || !user) {
+            return json(
+                { message: "登入狀態已失效，請重新登入。", error: error?.message },
+                401
+            );
+        }
+
+        return json({ authenticated: true, userId: user.id }, 200);
+    } catch (error) {
+        return json(
+            {
+                message: "檢查登入狀態失敗。",
+                error: error instanceof Error ? error.message : "Unknown error",
+            },
+            500
+        );
+    }
+}
+
 export async function POST(request: NextRequest) {
     try {
         if (!supabaseUrl || !supabasePublishableKey) {

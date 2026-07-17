@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { handleUnauthorizedResponse } from "./authStore";
 import { formatApiMessage } from "./format";
 import { municipalities } from "./locations";
 import type { Court, CourtsResponse, MatchResponse, StoredUser } from "./types";
@@ -131,6 +132,10 @@ export function CreateMatchPanel({
         }),
       });
       const data = (await response.json()) as MatchResponse;
+
+      if (handleUnauthorizedResponse(response)) {
+        onRequireLogin();
+      }
 
       if (!response.ok) {
         setCreateStatus(formatApiMessage(data, "建立球局失敗。"));
