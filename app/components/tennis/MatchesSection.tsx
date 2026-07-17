@@ -6,6 +6,7 @@ import {
   getMatchCardAction,
   MatchCard,
   type MatchCardActionType,
+  updateMatchParticipation,
 } from "./MatchCard";
 import { MATCHES_PAGE_SIZE, Pagination } from "./Pagination";
 import type {
@@ -26,6 +27,47 @@ type CachedMatchesPage = {
   matches: MatchSummary[];
   total: number;
 };
+
+type LocationResponse = {
+  city?: string | null;
+};
+
+let detectedCityPromise: Promise<string | null> | null = null;
+
+function detectCurrentCity() {
+  if (typeof navigator === "undefined" || !navigator.geolocation) {
+    return Promise.resolve(null);
+  }
+
+  if (!detectedCityPromise) {
+    detectedCityPromise = new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        async ({ coords }) => {
+          try {
+            const params = new URLSearchParams({
+              latitude: String(coords.latitude),
+              longitude: String(coords.longitude),
+            });
+            const response = await fetch(`/api/location?${params.toString()}`);
+            const data = (await response.json()) as LocationResponse;
+
+            resolve(response.ok ? data.city ?? null : null);
+          } catch {
+            resolve(null);
+          }
+        },
+        () => resolve(null),
+        {
+          enableHighAccuracy: false,
+          maximumAge: 30 * 60 * 1000,
+          timeout: 8000,
+        }
+      );
+    });
+  }
+
+  return detectedCityPromise;
+}
 
 function getMatchesCacheKey(
   userId: string | undefined,
@@ -57,6 +99,7 @@ export function MatchesSection({
   const [totalMatches, setTotalMatches] = useState(0);
   const matchesCacheRef = useRef(new Map<string, CachedMatchesPage>());
   const lastRefreshKeyRef = useRef(refreshKey);
+  const hasManuallySelectedCityRef = useRef(false);
 
   const matchDistrictOptions = useMemo(() => {
     if (!selectedMatchCity) return [];
@@ -67,6 +110,31 @@ export function MatchesSection({
       )?.districts ?? []
     );
   }, [selectedMatchCity]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    void detectCurrentCity().then((city) => {
+      if (!isActive || !city || hasManuallySelectedCityRef.current) return;
+
+      const isSupportedCity = municipalities.some(
+        (municipality) => municipality.city === city
+      );
+
+      if (!isSupportedCity) return;
+
+      setSelectedMatchCity(city);
+      setSelectedMatchDistrict("");
+      setCurrentPage(1);
+      setOpenMatches([]);
+      setTotalMatches(0);
+      setMatchesStatus("正在載入附近球局...");
+    });
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (lastRefreshKeyRef.current !== refreshKey) {
@@ -177,6 +245,7 @@ export function MatchesSection({
   function handleMatchCitySelect(city: string) {
     const nextCity = selectedMatchCity === city ? "" : city;
 
+    hasManuallySelectedCityRef.current = true;
     setSelectedMatchCity(nextCity);
     setSelectedMatchDistrict("");
     setCurrentPage(1);
@@ -320,6 +389,14 @@ export function MatchesSection({
         return;
       }
 
+      setOpenMatches((matches) =>
+        matches.map((match) =>
+          match.id === matchId
+            ? updateMatchParticipation(match, currentUser, true)
+            : match
+        )
+      );
+
       if (data.message === "你已經加入此球局。") {
         refreshMatchesAfterMutation();
         return;
@@ -366,6 +443,14 @@ export function MatchesSection({
         setActionStatus(formatApiMessage(data, "退出球局失敗。"));
         return;
       }
+
+      setOpenMatches((matches) =>
+        matches.map((match) =>
+          match.id === matchId
+            ? updateMatchParticipation(match, currentUser, false)
+            : match
+        )
+      );
 
       setActionStatus(formatApiMessage(data, "已退出球局。"));
       refreshMatchesAfterMutation();

@@ -30,6 +30,55 @@ type GetMatchCardActionProps = {
   pendingAction?: MatchCardActionType | null;
 };
 
+export function updateMatchParticipation(
+  match: MatchSummary,
+  currentUser: StoredUser,
+  hasJoined: boolean
+): MatchSummary {
+  if (match.hasJoined === hasJoined) return match;
+
+  const joinedPlayers = Math.max(
+    0,
+    Math.min(
+      match.requiredPlayers,
+      match.joinedPlayers + (hasJoined ? 1 : -1)
+    )
+  );
+  const participants = hasJoined
+    ? match.participants.some((participant) => participant.id === currentUser.id)
+      ? match.participants
+      : [
+          ...match.participants,
+          {
+            id: currentUser.id,
+            email: currentUser.email,
+            nickname: currentUser.name,
+            ntrpLevel: currentUser.ntrpLevel ?? null,
+            role: "參與者",
+            status: "已加入",
+          },
+        ]
+    : match.participants.filter(
+        (participant) => participant.id !== currentUser.id
+      );
+  const status =
+    match.status === "已結束"
+      ? match.status
+      : joinedPlayers >= match.requiredPlayers
+        ? "已滿團"
+        : match.status === "已滿團"
+          ? "徵求中"
+          : match.status;
+
+  return {
+    ...match,
+    hasJoined,
+    joinedPlayers,
+    participants,
+    status,
+  };
+}
+
 export function getMatchCardAction({
   currentUser,
   match,

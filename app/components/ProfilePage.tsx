@@ -23,9 +23,14 @@ import {
   getMatchCardAction,
   MatchCard,
   type MatchCardActionType,
+  updateMatchParticipation,
 } from "./tennis/MatchCard";
 import { MATCHES_PAGE_SIZE, Pagination } from "./tennis/Pagination";
-import type { MatchResponse, ProfileResponse } from "./tennis/types";
+import type {
+  MatchResponse,
+  MatchSummary,
+  ProfileResponse,
+} from "./tennis/types";
 
 type ProfileTab = "created" | "joined";
 type ProfileMatchAction = MatchCardActionType;
@@ -199,6 +204,26 @@ export default function ProfilePage({ viewedUserId }: ProfilePageProps) {
           : action === "join"
           ? "已加入球局。"
           : "已退出球局。";
+
+      if (action === "join" || action === "leave") {
+        const hasJoined = action === "join";
+        const updateMatches = (matches: MatchSummary[] = []) =>
+          matches.map((match) =>
+            match.id === matchId
+              ? updateMatchParticipation(match, currentUser, hasJoined)
+              : match
+          );
+
+        setProfile((current) =>
+          current
+            ? {
+                ...current,
+                createdMatches: updateMatches(current.createdMatches),
+                joinedMatches: updateMatches(current.joinedMatches),
+              }
+            : current
+        );
+      }
 
       setActionStatus(formatApiMessage(data, fallbackMessage));
       setCreatedPage(1);
